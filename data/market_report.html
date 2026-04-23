@@ -1,0 +1,236 @@
+
+<html><head><meta charset='utf-8'/>
+<style>
+body { font-family: Inter, Arial, sans-serif; background:#0c1326; color:#edf3ff; margin:0; padding:32px; }
+.container { max-width:1500px; margin:0 auto; }
+.grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+.card { background:#111a31; border:1px solid #24365f; border-radius:18px; padding:18px; }
+.label { color:#8ea3ca; font-size:12px; text-transform:uppercase; }
+.value { color:#7fe5c0; font-size:26px; font-weight:700; margin-top:8px; }
+.table { width:100%; border-collapse:collapse; background:#111a31; }
+.table th,.table td { padding:12px 14px; border-bottom:1px solid #223257; text-align:left; }
+.table th { background:#0d1429; color:#a7c0ff; }
+</style></head><body>
+<div class='container'>
+<h1>Prague Real Estate Market Report</h1>
+<div class='grid'>
+<div class='card'><div class='label'>Active listings</div><div class='value'>6,437</div></div>
+<div class='card'><div class='label'>Total market value</div><div class='value'>121 133 365 884 Kč</div></div>
+<div class='card'><div class='label'>Average asking price</div><div class='value'>20 249 643 Kč</div></div>
+</div>
+<p>Average listing duration: 0.0 days</p>
+<h2>Breakdown by source</h2>
+<table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>source</th>
+      <th>listing_count</th>
+      <th>total_market_value_czk</th>
+      <th>average_asking_price_czk</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>sreality</td>
+      <td>6400</td>
+      <td>1.211334e+11</td>
+      <td>2.024964e+07</td>
+    </tr>
+    <tr>
+      <td>bezrealitky</td>
+      <td>37</td>
+      <td>0.000000e+00</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+<h2>Top district / property-type groups</h2>
+<table class="dataframe table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>district_name</th>
+      <th>property_type</th>
+      <th>listing_count</th>
+      <th>total_market_value_czk</th>
+      <th>median_price_per_m2_czk</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Praha 5</td>
+      <td>byty</td>
+      <td>34</td>
+      <td>1.261483e+10</td>
+      <td>4733054.205</td>
+    </tr>
+    <tr>
+      <td>Praha 8</td>
+      <td>pozemky</td>
+      <td>8</td>
+      <td>5.851990e+09</td>
+      <td>751301.160</td>
+    </tr>
+    <tr>
+      <td>Smíchov</td>
+      <td>byty</td>
+      <td>320</td>
+      <td>4.878880e+09</td>
+      <td>190147.350</td>
+    </tr>
+    <tr>
+      <td>Praha 9</td>
+      <td>byty</td>
+      <td>18</td>
+      <td>4.299468e+09</td>
+      <td>1405422.570</td>
+    </tr>
+    <tr>
+      <td>Žižkov</td>
+      <td>byty</td>
+      <td>261</td>
+      <td>3.020806e+09</td>
+      <td>178826.920</td>
+    </tr>
+    <tr>
+      <td>Vinohrady</td>
+      <td>byty</td>
+      <td>184</td>
+      <td>2.881967e+09</td>
+      <td>191674.975</td>
+    </tr>
+    <tr>
+      <td>Holešovice</td>
+      <td>byty</td>
+      <td>165</td>
+      <td>2.599243e+09</td>
+      <td>205555.560</td>
+    </tr>
+    <tr>
+      <td>Nové Město</td>
+      <td>byty</td>
+      <td>162</td>
+      <td>2.430745e+09</td>
+      <td>194560.930</td>
+    </tr>
+    <tr>
+      <td>Praha 10</td>
+      <td>byty</td>
+      <td>9</td>
+      <td>2.296698e+09</td>
+      <td>230851.060</td>
+    </tr>
+    <tr>
+      <td>Praha 2</td>
+      <td>komercni prostory</td>
+      <td>5</td>
+      <td>2.110000e+09</td>
+      <td>2078817.730</td>
+    </tr>
+    <tr>
+      <td>Hlubočepy</td>
+      <td>byty</td>
+      <td>200</td>
+      <td>1.940656e+09</td>
+      <td>165454.550</td>
+    </tr>
+    <tr>
+      <td>Vysočany</td>
+      <td>byty</td>
+      <td>159</td>
+      <td>1.670032e+09</td>
+      <td>171190.480</td>
+    </tr>
+    <tr>
+      <td>Praha 16</td>
+      <td>pozemky</td>
+      <td>1</td>
+      <td>1.615200e+09</td>
+      <td>1615200.000</td>
+    </tr>
+    <tr>
+      <td>Libeň</td>
+      <td>byty</td>
+      <td>157</td>
+      <td>1.610046e+09</td>
+      <td>169995.000</td>
+    </tr>
+    <tr>
+      <td>Praha 20</td>
+      <td>pozemky</td>
+      <td>9</td>
+      <td>1.449889e+09</td>
+      <td>186406.810</td>
+    </tr>
+    <tr>
+      <td>Vršovice</td>
+      <td>byty</td>
+      <td>158</td>
+      <td>1.415501e+09</td>
+      <td>162982.460</td>
+    </tr>
+    <tr>
+      <td>Praha 13</td>
+      <td>domy</td>
+      <td>2</td>
+      <td>1.364000e+09</td>
+      <td>2774222.220</td>
+    </tr>
+    <tr>
+      <td>Praha 13</td>
+      <td>pozemky</td>
+      <td>1</td>
+      <td>1.351000e+09</td>
+      <td>2266778.520</td>
+    </tr>
+    <tr>
+      <td>Košíře</td>
+      <td>byty</td>
+      <td>108</td>
+      <td>1.309129e+09</td>
+      <td>176372.550</td>
+    </tr>
+    <tr>
+      <td>Chodov</td>
+      <td>byty</td>
+      <td>133</td>
+      <td>1.292032e+09</td>
+      <td>175648.650</td>
+    </tr>
+    <tr>
+      <td>Nusle</td>
+      <td>byty</td>
+      <td>118</td>
+      <td>1.200616e+09</td>
+      <td>163846.150</td>
+    </tr>
+    <tr>
+      <td>Stodůlky</td>
+      <td>byty</td>
+      <td>118</td>
+      <td>1.153801e+09</td>
+      <td>145346.745</td>
+    </tr>
+    <tr>
+      <td>Karlín</td>
+      <td>byty</td>
+      <td>80</td>
+      <td>1.103555e+09</td>
+      <td>194878.050</td>
+    </tr>
+    <tr>
+      <td>Staré Město</td>
+      <td>byty</td>
+      <td>59</td>
+      <td>1.013592e+09</td>
+      <td>234673.610</td>
+    </tr>
+    <tr>
+      <td>Praha 4</td>
+      <td>domy</td>
+      <td>2</td>
+      <td>9.230000e+08</td>
+      <td>1062877.070</td>
+    </tr>
+  </tbody>
+</table>
+</div></body></html>
