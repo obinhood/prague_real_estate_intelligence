@@ -337,7 +337,11 @@ function makeChart(id, type, data, extra={}) {
   const ctx = document.getElementById(id);
   if (!ctx) return;
   try {
-    charts[id] = new Chart(ctx, {type, data, options:{...CHART_DEFAULTS, ...extra, plugins:{...CHART_DEFAULTS.plugins,...(extra.plugins||{})}}});
+    const cartesian = !['doughnut','pie','polarArea','radar'].includes(type);
+    const base = cartesian ? CHART_DEFAULTS : {animation:CHART_DEFAULTS.animation}; // no scales for non-cartesian
+    const options = {...base, ...extra, plugins:{...CHART_DEFAULTS.plugins,...(extra.plugins||{})}};
+    if (!cartesian) delete options.scales;
+    charts[id] = new Chart(ctx, {type, data, options});
   } catch(e) { console.warn('[Chart]', id, e.message); }
 }
 
@@ -406,7 +410,7 @@ function renderPropertyBreakdown(allListings) {
   const types = Object.keys(grouped).sort((a,b) => grouped[b].length - grouped[a].length);
   const counts = types.map(t => grouped[t].length);
   const medians = types.map(t => {
-    const prices = grouped[t].map(l=>l.price_czk).filter(p=>p!=null).sort((a,b)=>a-b);
+    const prices = grouped[t].map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b);
     return prices.length ? prices[Math.floor(prices.length/2)] : 0;
   });
 
@@ -438,7 +442,7 @@ function renderPropertyBreakdown(allListings) {
   const tierColors = {budget:'var(--green)',mid:'var(--blue)',premium:'var(--yellow)',luxury:'var(--purple)'};
   document.getElementById('type-stats-body').innerHTML = types.map((t,i) => {
     const items = grouped[t];
-    const prices = items.map(l=>l.price_czk).filter(p=>p!=null).sort((a,b)=>a-b);
+    const prices = items.map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b);
     const med = prices.length ? prices[Math.floor(prices.length/2)] : null;
     const avgArea = items.reduce((s,l)=>s+(l.area_m2||0),0) / (items.filter(l=>l.area_m2).length||1);
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
