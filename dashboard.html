@@ -7,23 +7,20 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
 :root{
-  --bg:#070b14;--bg-card:#0d1526;--bg-card2:#111e35;--bg-sidebar:#090e1c;
+  --bg:#070b14;--bg-card:#0d1526;--bg-card2:#111e35;
   --border:rgba(92,120,200,0.18);--border-h:rgba(110,145,240,0.35);
   --text:#e8efff;--t2:#8fa3cc;--t3:#5a6e96;
   --blue:#6b8fff;--green:#6ee7b7;--red:#ff7070;--yellow:#f7d47c;--purple:#a78bfa;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5}
-a{color:var(--blue);text-decoration:none}
-a:hover{text-decoration:underline}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 button{cursor:pointer;border:none;outline:none;background:none}
 input,select{background:var(--bg-card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none}
 input:focus,select:focus{border-color:var(--blue)}
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:var(--bg-card)}
 ::-webkit-scrollbar-thumb{background:rgba(107,143,255,0.3);border-radius:3px}
-
-/* Layout */
 #app{min-height:100vh}
 .header{background:rgba(7,11,20,0.95);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
 .header-left{display:flex;align-items:center;gap:14px}
@@ -32,17 +29,16 @@ input:focus,select:focus{border-color:var(--blue)}
 .api-badge.live{background:rgba(110,231,183,0.15);color:var(--green);border:1px solid rgba(110,231,183,0.3)}
 .api-badge.mock{background:rgba(247,212,124,0.15);color:var(--yellow);border:1px solid rgba(247,212,124,0.3)}
 .header-right{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t2)}
+.lang-btn{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:700;color:var(--t3);border:1px solid transparent;transition:all .15s}
+.lang-btn.active,.lang-btn:hover{color:var(--blue);border-color:rgba(107,143,255,0.4);background:rgba(107,143,255,0.1)}
 .main{padding:20px 24px;max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 .grid{display:grid;gap:14px}
-.g2{grid-template-columns:repeat(2,1fr)}
-.g3{grid-template-columns:repeat(3,1fr)}
-.g4{grid-template-columns:repeat(4,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
 @media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:700px){.g4,.g3,.g2{grid-template-columns:1fr}}
-
-/* Cards */
 .card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:18px 20px}
-.kpi{background:linear-gradient(160deg,#0e1830,#08101f);border:1px solid var(--border);border-radius:18px;padding:18px 20px;min-height:128px;position:relative;overflow:hidden}
+.card-title{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)}
+.kpi{background:linear-gradient(160deg,#0e1830,#08101f);border:1px solid var(--border);border-radius:18px;padding:18px 20px;min-height:128px}
 .kpi .lbl{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:8px}
 .kpi .val{font-size:24px;font-weight:800;color:var(--text);line-height:1.1}
 .kpi .delta{margin-top:8px;font-size:13px;display:flex;align-items:center;gap:4px}
@@ -50,11 +46,7 @@ input:focus,select:focus{border-color:var(--blue)}
 .simple-kpi{background:linear-gradient(160deg,#0e1830,#08101f);border:1px solid var(--border);border-radius:18px;padding:16px 20px;min-height:90px}
 .simple-kpi .lbl{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:6px}
 .simple-kpi .val{font-size:22px;font-weight:800}
-
-/* Section header */
 .sec-hdr{font-size:13px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border);padding-bottom:8px}
-
-/* Table */
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{padding:10px 12px;border-bottom:1px solid rgba(107,143,255,0.3);color:var(--blue);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;cursor:pointer;user-select:none;background:var(--bg-card)}
@@ -66,41 +58,30 @@ tr:hover td{background:var(--bg-card2)}
 .badge-blue{background:rgba(107,143,255,0.12);color:var(--blue)}
 .badge-yellow{background:rgba(247,212,124,0.12);color:var(--yellow)}
 .badge-purple{background:rgba(167,139,250,0.12);color:var(--purple)}
-
-/* Filters */
 .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .filter-bar input,.filter-bar select{min-width:140px;max-width:200px}
 .btn{background:rgba(107,143,255,0.15);color:var(--blue);border:1px solid rgba(107,143,255,0.3);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;transition:background .15s}
-.btn:hover{background:rgba(107,143,255,0.25)}
-.btn-sm{padding:4px 10px;font-size:12px}
-
-/* Pagination */
+.btn:hover{background:rgba(107,143,255,0.25)}.btn-sm{padding:4px 10px;font-size:12px}
 .pagination{display:flex;align-items:center;gap:8px;justify-content:flex-end;padding-top:12px}
 .pg-btn{background:var(--bg-card2);color:var(--t2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer}
-.pg-btn:hover{border-color:var(--blue);color:var(--blue)}
-.pg-btn:disabled{opacity:0.4;cursor:default}
-
-/* Hero */
+.pg-btn:hover{border-color:var(--blue);color:var(--blue)}.pg-btn:disabled{opacity:0.4;cursor:default}
 .hero{background:linear-gradient(135deg,rgba(20,35,75,0.9),rgba(8,13,26,0.97));border:1px solid rgba(107,143,255,0.22);border-radius:20px;padding:22px 26px}
 .hero .eyebrow{font-size:11px;color:var(--blue);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:6px}
 .hero h1{font-size:22px;font-weight:800;margin-bottom:6px}
 .hero p{color:var(--t2);font-size:13px}
-
-/* Loading */
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:999;flex-direction:column;gap:12px}
 #loading .spinner{width:36px;height:36px;border:3px solid rgba(107,143,255,0.2);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .hidden{display:none!important}
-
-/* Chart containers */
 .chart-box{position:relative;height:220px}
+.qrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
 </style>
 </head>
 <body>
 
 <div id="loading">
   <div class="spinner"></div>
-  <div style="color:var(--t2);font-size:13px">Loading dashboard…</div>
+  <div style="color:var(--t2);font-size:13px" id="loading-text">Loading dashboard…</div>
 </div>
 
 <div id="app" class="hidden">
@@ -113,201 +94,360 @@ tr:hover td{background:var(--bg-card2)}
       <span id="header-date"></span>
       <span style="color:var(--t3)">|</span>
       <span id="header-count"></span>
+      <span style="color:var(--t3)">|</span>
+      <button class="lang-btn active" onclick="setLang('en')" id="lang-en">EN</button>
+      <button class="lang-btn" onclick="setLang('cs')" id="lang-cs">CS</button>
+      <button class="lang-btn" onclick="setLang('vi')" id="lang-vi">VI</button>
     </div>
   </header>
 
   <div class="main">
-    <!-- Hero -->
     <div class="hero">
-      <div class="eyebrow">Prague Market Intelligence</div>
-      <h1>Daily listing intelligence for analysts, investors &amp; operators</h1>
-      <p id="hero-text">Tracks active inventory, pricing, removals, and district-level movement using daily scrape snapshots.</p>
+      <div class="eyebrow" data-i18n="hero.eyebrow">Prague Market Intelligence</div>
+      <h1 data-i18n="hero.title">Daily listing intelligence for analysts, investors &amp; operators</h1>
+      <p id="hero-text"></p>
     </div>
 
-    <!-- KPI Row 1 -->
     <div class="grid g4" id="kpi-row1"></div>
-    <!-- KPI Row 2 -->
     <div class="grid g4" id="kpi-row2"></div>
 
-    <!-- Charts -->
-    <div class="sec-hdr">Market Trends</div>
+    <div class="sec-hdr" data-i18n="sec.trends">Market Trends</div>
     <div class="grid g2">
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Active Listings Over Time</div><div class="chart-box"><canvas id="chart-inventory"></canvas></div></div>
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Median Price (Kč) Over Time</div><div class="chart-box"><canvas id="chart-price"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.inventory">Active Listings Over Time</div><div class="chart-box"><canvas id="chart-inventory"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.price">Median Price Over Time</div><div class="chart-box"><canvas id="chart-price"></canvas></div></div>
     </div>
 
-    <!-- Districts -->
-    <div class="sec-hdr">District Analysis</div>
+    <div class="sec-hdr" data-i18n="sec.districts">District Analysis</div>
     <div class="grid g2">
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Active Listings by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-count"></canvas></div></div>
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Median Kč/m² by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-price"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.district_count">Active Listings by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-count"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.district_price">Median Price/m² by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-price"></canvas></div></div>
     </div>
 
-    <!-- Property Type Breakdown -->
-    <div class="sec-hdr">Property Type Breakdown</div>
+    <div class="sec-hdr" data-i18n="sec.type">Property Type Breakdown</div>
     <div class="grid g3">
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Listings by Type</div><div class="chart-box"><canvas id="chart-type-count"></canvas></div></div>
-      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Median Price by Type</div><div class="chart-box"><canvas id="chart-type-price"></canvas></div></div>
-      <div class="card" id="type-stats-card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Type Summary</div><div id="type-stats-body"></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.type_count">Listings by Type</div><div class="chart-box"><canvas id="chart-type-count"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.type_price">Median Price by Type</div><div class="chart-box"><canvas id="chart-type-price"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.type_summary">Type Summary</div><div id="type-stats-body"></div></div>
     </div>
 
-    <!-- Market Movements -->
-    <div class="sec-hdr">Market Movements</div>
+    <div class="sec-hdr" data-i18n="sec.investor">Investor Signals</div>
+    <div class="grid g3">
+      <div class="card"><div class="card-title" data-i18n="chart.dom_buckets">Days on Market Distribution</div><div class="chart-box"><canvas id="chart-dom"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.tier_mix">Price Tier Mix</div><div class="chart-box"><canvas id="chart-tier"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.flow">Supply Flow (New vs. Removed)</div><div class="chart-box"><canvas id="chart-flow"></canvas></div></div>
+    </div>
+
+    <div class="sec-hdr" data-i18n="sec.movements">Market Movements</div>
     <div class="card">
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="movement-filters"></div>
-      <div class="tbl-wrap"><table id="movements-table"><thead><tr><th>Type</th><th>Title</th><th>District</th><th>Price</th><th>Change</th><th>Days on Market</th></tr></thead><tbody id="movements-body"></tbody></table></div>
+      <div class="tbl-wrap"><table id="movements-table">
+        <thead><tr>
+          <th data-i18n="col.type">Type</th><th data-i18n="col.title">Title</th>
+          <th data-i18n="col.district">District</th><th data-i18n="col.asking_price">Asking Price</th>
+          <th data-i18n="col.change">Change</th><th data-i18n="col.on_market">On Market</th>
+        </tr></thead>
+        <tbody id="movements-body"></tbody>
+      </table></div>
     </div>
 
-    <!-- Active Listings -->
-    <div class="sec-hdr">Active Listings</div>
+    <div class="sec-hdr" data-i18n="sec.listings">Active Listings</div>
     <div class="card">
       <div class="filter-bar" style="margin-bottom:10px">
-        <input type="text" id="search-input" placeholder="Search title, district…" style="flex:1;min-width:200px"/>
-        <select id="filter-district"><option value="">All Districts</option></select>
-        <select id="filter-type"><option value="">All Types</option></select>
+        <input type="text" id="search-input" data-i18n-placeholder="filter.search"/>
+        <select id="filter-district"><option value="" data-i18n="filter.all_districts">All Districts</option></select>
+        <select id="filter-type"><option value="" data-i18n="filter.all_types">All Types</option></select>
         <select id="filter-ring">
-          <option value="">All Rings</option>
-          <option value="inner">Inner</option>
-          <option value="central">Central</option>
-          <option value="middle">Middle</option>
-          <option value="outer">Outer</option>
+          <option value="" data-i18n="filter.all_zones">All Zones</option>
+          <option value="inner" data-i18n="ring.inner">Inner Prague</option>
+          <option value="central" data-i18n="ring.central">Central</option>
+          <option value="middle" data-i18n="ring.middle">Middle Ring</option>
+          <option value="outer" data-i18n="ring.outer">Outer Ring</option>
         </select>
-        <select id="filter-seller"><option value="">All Sellers</option></select>
-        <button class="btn btn-sm" onclick="resetFilters()">Reset</button>
+        <select id="filter-seller"><option value="" data-i18n="filter.all_sellers">All Sellers</option></select>
+        <button class="btn btn-sm" onclick="resetFilters()" data-i18n="filter.reset">Reset</button>
       </div>
       <div class="filter-bar" style="margin-bottom:14px">
         <select id="filter-bedrooms">
-          <option value="">Any Bedrooms</option>
-          <option value="0">Studio (1+kk)</option>
-          <option value="1">1 bed</option>
-          <option value="2">2 bed</option>
-          <option value="3">3 bed</option>
-          <option value="4">4+ bed</option>
+          <option value="" data-i18n="filter.any_beds">Any Bedrooms</option>
+          <option value="studio" data-i18n="filter.studio">Studio (1+kk)</option>
+          <option value="2" data-i18n="filter.beds2">2 Rooms</option>
+          <option value="3" data-i18n="filter.beds3">3 Rooms</option>
+          <option value="4" data-i18n="filter.beds4">4+ Rooms</option>
         </select>
         <select id="filter-tier">
-          <option value="">All Price Tiers</option>
-          <option value="budget">Budget (&lt;5M)</option>
-          <option value="mid">Mid (5–10M)</option>
-          <option value="premium">Premium (10–20M)</option>
-          <option value="luxury">Luxury (&gt;20M)</option>
+          <option value="" data-i18n="filter.all_tiers">All Price Tiers</option>
+          <option value="budget" data-i18n="tier.budget">Budget</option>
+          <option value="mid" data-i18n="tier.mid">Mid-Range</option>
+          <option value="premium" data-i18n="tier.premium">Premium</option>
+          <option value="luxury" data-i18n="tier.luxury">Luxury</option>
         </select>
-        <input type="number" id="filter-price-min" placeholder="Min price (CZK)"/>
-        <input type="number" id="filter-price-max" placeholder="Max price (CZK)"/>
-        <input type="number" id="filter-area-min" placeholder="Min m²"/>
-        <input type="number" id="filter-area-max" placeholder="Max m²"/>
+        <input type="number" id="filter-price-min" data-i18n-placeholder="filter.price_min"/>
+        <input type="number" id="filter-price-max" data-i18n-placeholder="filter.price_max"/>
+        <input type="number" id="filter-area-min" data-i18n-placeholder="filter.area_min"/>
+        <input type="number" id="filter-area-max" data-i18n-placeholder="filter.area_max"/>
         <select id="filter-newbuild">
-          <option value="">Any Build</option>
-          <option value="1">New Build Only</option>
-          <option value="0">Resale Only</option>
+          <option value="" data-i18n="filter.any_build">Any Build</option>
+          <option value="1" data-i18n="filter.new_build">New Build</option>
+          <option value="0" data-i18n="filter.resale">Resale</option>
         </select>
       </div>
       <div class="tbl-wrap"><table id="listings-table">
-        <thead><tr>
-          <th onclick="sortListings('title')">Title ↕</th>
-          <th onclick="sortListings('district_name')">District ↕</th>
-          <th onclick="sortListings('prague_ring')">Ring ↕</th>
-          <th onclick="sortListings('layout_type')">Layout ↕</th>
-          <th onclick="sortListings('area_m2')">Area ↕</th>
-          <th onclick="sortListings('price_czk')">Price ↕</th>
-          <th onclick="sortListings('price_per_m2_czk')">Kč/m² ↕</th>
-          <th onclick="sortListings('price_tier')">Tier ↕</th>
-          <th onclick="sortListings('listing_duration_days')">Days ↕</th>
-          <th>Link</th>
-        </tr></thead>
+        <thead><tr id="listings-thead"></tr></thead>
         <tbody id="listings-body"></tbody>
       </table></div>
       <div class="pagination">
         <span id="page-info" style="font-size:12px;color:var(--t3)"></span>
-        <button class="pg-btn" id="btn-prev" onclick="changePage(-1)">← Prev</button>
-        <button class="pg-btn" id="btn-next" onclick="changePage(1)">Next →</button>
+        <button class="pg-btn" id="btn-prev" onclick="changePage(-1)">← <span data-i18n="pager.prev">Prev</span></button>
+        <button class="pg-btn" id="btn-next" onclick="changePage(1)"><span data-i18n="pager.next">Next</span> →</button>
       </div>
     </div>
 
-    <!-- Data Quality -->
-    <div class="sec-hdr">Data Quality</div>
+    <div class="sec-hdr" data-i18n="sec.quality">Data Quality</div>
     <div class="card" id="quality-panel"></div>
 
     <div style="color:var(--t3);font-size:11px;text-align:center;padding:8px 0 24px">
-      Prague Real Estate Intelligence · Data sourced from Sreality · <span id="footer-date"></span>
+      Prague Real Estate Intelligence · Sreality · <span id="footer-date"></span>
     </div>
   </div>
 </div>
 
 <script>
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const API = window.location.port === '8000' || window.location.hostname === 'localhost' ? '' : '';
-const FMT = {
-  czk: v => v == null ? 'n/a' : Math.round(v).toLocaleString('cs-CZ') + ' Kč',
-  m:   v => v == null ? 'n/a' : (v/1e6).toFixed(1) + ' M Kč',
-  b:   v => v == null ? 'n/a' : (v/1e9).toFixed(2) + ' B Kč',
-  int: v => v == null ? 'n/a' : Math.round(v).toLocaleString('cs-CZ'),
-  pct: v => v == null ? '' : (v > 0 ? '+' : '') + v.toFixed(1) + '%',
-  day: v => v == null ? 'n/a' : Math.round(v) + ' d',
+// ─── TRANSLATIONS ──────────────────────────────────────────────────────────────
+const TR = {
+  en: {
+    'hero.eyebrow':'Prague Market Intelligence',
+    'hero.title':'Daily listing intelligence for analysts, investors & operators',
+    'sec.trends':'Market Trends','sec.districts':'District Analysis',
+    'sec.type':'Property Type Breakdown','sec.investor':'Investor Signals',
+    'sec.movements':'Market Movements','sec.listings':'Active Listings','sec.quality':'Data Quality',
+    'chart.inventory':'Active Listings Over Time','chart.price':'Median Price Over Time',
+    'chart.district_count':'Active Listings by District','chart.district_price':'Median Price/m² by District',
+    'chart.type_count':'Listings by Type','chart.type_price':'Median Price by Type','chart.type_summary':'Type Summary',
+    'chart.dom_buckets':'Days on Market Distribution','chart.tier_mix':'Price Tier Mix','chart.flow':'Supply Flow (New vs. Removed)',
+    'kpi.active':'Active Listings','kpi.value':'Total Market Value','kpi.price':'Median Asking Price','kpi.ppm2':'Median Price/m²',
+    'kpi.new':'New Listings','kpi.removed':'Removed','kpi.reductions':'Price Reductions','kpi.days':'Avg. Days on Market',
+    'col.type':'Type','col.title':'Title','col.district':'District','col.zone':'Zone','col.layout':'Layout',
+    'col.area':'Area (m²)','col.asking_price':'Asking Price','col.ppm2':'Price/m²','col.tier':'Price Tier',
+    'col.on_market':'On Market','col.link':'Link','col.change':'Change',
+    'filter.search':'Search listings…','filter.all_districts':'All Districts','filter.all_types':'All Types',
+    'filter.all_zones':'All Zones','filter.all_sellers':'All Sellers','filter.any_beds':'Any Bedrooms',
+    'filter.studio':'Studio','filter.beds2':'2 Rooms','filter.beds3':'3 Rooms','filter.beds4':'4+ Rooms',
+    'filter.all_tiers':'All Price Tiers','filter.price_min':'Min Price (CZK)','filter.price_max':'Max Price (CZK)',
+    'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Any Build',
+    'filter.new_build':'New Build Only','filter.resale':'Resale Only','filter.reset':'Reset',
+    'pager.prev':'Prev','pager.next':'Next',
+    'dom.fresh':'Fresh (0–7d)','dom.active':'Active (8–30d)','dom.stale':'Stale (31–90d)','dom.stuck':'Stuck (90d+)',
+    'tier.budget':'Budget','tier.mid':'Mid-Range','tier.premium':'Premium','tier.luxury':'Luxury',
+    'ring.inner':'Inner Prague','ring.central':'Central','ring.middle':'Middle Ring','ring.outer':'Outer Ring',
+    'type.byty':'Apartments','type.domy':'Houses','type.komercni prostory':'Commercial',
+    'type.pozemky':'Land','type.ostatni':'Other','type.unknown':'Unknown',
+    'seller.agent':'Agent','seller.private':'Private','seller.developer':'Developer',
+    'mov.all':'All','mov.new':'New','mov.removed':'Removed','mov.price_reduction':'Price ↓','mov.price_increase':'Price ↑',
+    'quality.coverage':'Coverage','quality.active':'active','quality.total':'total',
+    'quality.missing_price':'Missing price','quality.missing_area':'Missing area',
+    'quality.missing_coords':'Missing coordinates','quality.location_issues':'Location quality issues',
+    'stats.count_median':'count · median price',
+    'hero.live':'Live data · snapshot {0} vs {1}','hero.mock':'Running on embedded demo data — start the API for live figures.',
+    'snapshot.only_one':'Only one snapshot — run pipeline again for deltas',
+  },
+  cs: {
+    'hero.eyebrow':'Pražský realitní trh',
+    'hero.title':'Denní přehled inzerátů pro analytiky, investory a operátory',
+    'sec.trends':'Tržní trendy','sec.districts':'Analýza obvodů',
+    'sec.type':'Přehled typů nemovitostí','sec.investor':'Investorské signály',
+    'sec.movements':'Pohyb trhu','sec.listings':'Aktivní nabídky','sec.quality':'Kvalita dat',
+    'chart.inventory':'Aktivní inzeráty v čase','chart.price':'Mediánová cena v čase',
+    'chart.district_count':'Aktivní inzeráty podle obvodu','chart.district_price':'Mediánová cena/m² podle obvodu',
+    'chart.type_count':'Inzeráty podle typu','chart.type_price':'Mediánová cena podle typu','chart.type_summary':'Přehled typů',
+    'chart.dom_buckets':'Délka inzerce','chart.tier_mix':'Složení trhu (cenové kategorie)','chart.flow':'Průtok nabídky (nové vs. stažené)',
+    'kpi.active':'Aktivní inzeráty','kpi.value':'Celková tržní hodnota','kpi.price':'Mediánová cena','kpi.ppm2':'Mediánová cena/m²',
+    'kpi.new':'Nové inzeráty','kpi.removed':'Staženo','kpi.reductions':'Snížení cen','kpi.days':'Průměrná délka inzerce',
+    'col.type':'Typ','col.title':'Název','col.district':'Obvod','col.zone':'Zóna','col.layout':'Dispozice',
+    'col.area':'Plocha (m²)','col.asking_price':'Cena','col.ppm2':'Kč/m²','col.tier':'Kategorie',
+    'col.on_market':'Na trhu','col.link':'Odkaz','col.change':'Změna',
+    'filter.search':'Hledat nabídky…','filter.all_districts':'Všechny obvody','filter.all_types':'Všechny typy',
+    'filter.all_zones':'Všechny zóny','filter.all_sellers':'Všichni prodejci','filter.any_beds':'Libovolný počet pokojů',
+    'filter.studio':'Garsoniéra','filter.beds2':'2 pokoje','filter.beds3':'3 pokoje','filter.beds4':'4+ pokojů',
+    'filter.all_tiers':'Všechny kategorie','filter.price_min':'Min cena (Kč)','filter.price_max':'Max cena (Kč)',
+    'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Libovolné',
+    'filter.new_build':'Pouze novostavby','filter.resale':'Pouze starší','filter.reset':'Resetovat',
+    'pager.prev':'Předchozí','pager.next':'Další',
+    'dom.fresh':'Čerstvé (0–7 dní)','dom.active':'Aktivní (8–30 dní)','dom.stale':'Staré (31–90 dní)','dom.stuck':'Zaseklé (90+ dní)',
+    'tier.budget':'Dostupné','tier.mid':'Střední','tier.premium':'Prémiové','tier.luxury':'Luxusní',
+    'ring.inner':'Centrum','ring.central':'Vnitřní město','ring.middle':'Střední okruh','ring.outer':'Vnější okruh',
+    'type.byty':'Byty','type.domy':'Domy','type.komercni prostory':'Komerční',
+    'type.pozemky':'Pozemky','type.ostatni':'Ostatní','type.unknown':'Neznámé',
+    'seller.agent':'Makléř','seller.private':'Soukromý','seller.developer':'Developer',
+    'mov.all':'Vše','mov.new':'Nové','mov.removed':'Stažené','mov.price_reduction':'Snížení ceny','mov.price_increase':'Zvýšení ceny',
+    'quality.coverage':'Pokrytí','quality.active':'aktivní','quality.total':'celkem',
+    'quality.missing_price':'Chybí cena','quality.missing_area':'Chybí plocha',
+    'quality.missing_coords':'Chybí souřadnice','quality.location_issues':'Problémy s polohou',
+    'stats.count_median':'počet · mediánová cena',
+    'hero.live':'Živá data · snímek {0} vs {1}','hero.mock':'Zobrazuji ukázková data — spusťte API pro živá data.',
+    'snapshot.only_one':'Pouze jeden snímek — spusťte pipeline znovu pro delta hodnoty',
+  },
+  vi: {
+    'hero.eyebrow':'Thông tin thị trường bất động sản Praha',
+    'hero.title':'Dữ liệu rao bán hàng ngày cho nhà phân tích, nhà đầu tư và vận hành',
+    'sec.trends':'Xu hướng thị trường','sec.districts':'Phân tích theo quận',
+    'sec.type':'Phân loại bất động sản','sec.investor':'Tín hiệu đầu tư',
+    'sec.movements':'Biến động thị trường','sec.listings':'Bất động sản hiện tại','sec.quality':'Chất lượng dữ liệu',
+    'chart.inventory':'Số lượng rao bán theo thời gian','chart.price':'Giá trung vị theo thời gian',
+    'chart.district_count':'Số lượng rao bán theo quận','chart.district_price':'Giá trung vị/m² theo quận',
+    'chart.type_count':'Phân loại bất động sản','chart.type_price':'Giá trung vị theo loại','chart.type_summary':'Tóm tắt loại hình',
+    'chart.dom_buckets':'Phân phối thời gian rao','chart.tier_mix':'Cơ cấu phân khúc giá','chart.flow':'Luồng cung (Mới vs. Đã rút)',
+    'kpi.active':'Đang rao bán','kpi.value':'Tổng giá trị thị trường','kpi.price':'Giá trung vị','kpi.ppm2':'Giá trung vị/m²',
+    'kpi.new':'Mới rao','kpi.removed':'Đã rút','kpi.reductions':'Giảm giá','kpi.days':'Số ngày rao TB',
+    'col.type':'Loại','col.title':'Tiêu đề','col.district':'Quận','col.zone':'Khu vực','col.layout':'Mặt bằng',
+    'col.area':'Diện tích (m²)','col.asking_price':'Giá rao','col.ppm2':'Giá/m²','col.tier':'Phân khúc',
+    'col.on_market':'Thời gian rao','col.link':'Xem','col.change':'Thay đổi',
+    'filter.search':'Tìm kiếm bất động sản…','filter.all_districts':'Tất cả quận','filter.all_types':'Tất cả loại',
+    'filter.all_zones':'Tất cả khu vực','filter.all_sellers':'Tất cả bên bán','filter.any_beds':'Tất cả số phòng',
+    'filter.studio':'Studio','filter.beds2':'2 phòng','filter.beds3':'3 phòng','filter.beds4':'4+ phòng',
+    'filter.all_tiers':'Tất cả phân khúc','filter.price_min':'Giá tối thiểu (CZK)','filter.price_max':'Giá tối đa (CZK)',
+    'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Tất cả',
+    'filter.new_build':'Chỉ nhà mới xây','filter.resale':'Chỉ nhà cũ','filter.reset':'Đặt lại',
+    'pager.prev':'Trước','pager.next':'Tiếp',
+    'dom.fresh':'Mới rao (0–7 ngày)','dom.active':'Đang bán (8–30 ngày)','dom.stale':'Khó bán (31–90 ngày)','dom.stuck':'Tồn kho (90+ ngày)',
+    'tier.budget':'Bình dân','tier.mid':'Tầm trung','tier.premium':'Cao cấp','tier.luxury':'Hạng sang',
+    'ring.inner':'Trung tâm','ring.central':'Nội thành','ring.middle':'Vành đai giữa','ring.outer':'Ngoại thành',
+    'type.byty':'Căn hộ','type.domy':'Nhà ở','type.komercni prostory':'Thương mại',
+    'type.pozemky':'Đất','type.ostatni':'Khác','type.unknown':'Không rõ',
+    'seller.agent':'Môi giới','seller.private':'Cá nhân','seller.developer':'Chủ đầu tư',
+    'mov.all':'Tất cả','mov.new':'Mới','mov.removed':'Đã rút','mov.price_reduction':'Giảm giá','mov.price_increase':'Tăng giá',
+    'quality.coverage':'Độ phủ','quality.active':'đang hoạt động','quality.total':'tổng cộng',
+    'quality.missing_price':'Thiếu giá','quality.missing_area':'Thiếu diện tích',
+    'quality.missing_coords':'Thiếu tọa độ','quality.location_issues':'Vấn đề địa điểm',
+    'stats.count_median':'số lượng · giá trung vị',
+    'hero.live':'Dữ liệu trực tiếp · ảnh chụp {0} so với {1}','hero.mock':'Đang dùng dữ liệu mẫu — khởi động API để xem dữ liệu thực.',
+    'snapshot.only_one':'Chỉ có một ảnh chụp — chạy lại pipeline để có delta',
+  }
 };
 
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
+let lang = 'en';
+function t(key) { return TR[lang][key] || TR.en[key] || key; }
+function tv(field, val) {
+  if (!val) return val;
+  const k = field + '.' + String(val).toLowerCase();
+  return TR[lang][k] || TR.en[k] || val;
+}
+function tf(str, ...args) { return str.replace(/{(\d+)}/g,(_,i)=>args[i]??_); }
+
+function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  // Update select option text that has data-i18n
+  document.querySelectorAll('option[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  const lb = document.getElementById('lang-'+lang);
+  if (lb) lb.classList.add('active');
+  document.documentElement.lang = lang;
+}
+
+// ─── COMPUTED FIELD HELPERS ────────────────────────────────────────────────────
+function computeTier(price) {
+  const p = +price;
+  if (!p) return null;
+  if (p < 5e6)  return 'budget';
+  if (p < 10e6) return 'mid';
+  if (p < 20e6) return 'premium';
+  return 'luxury';
+}
+function ringFromDistrict(dist) {
+  if (!dist) return null;
+  const m = dist.match(/Praha\s+(\d+)/i);
+  if (!m) return null;
+  const n = +m[1];
+  if (n <= 2) return 'inner';
+  if (n <= 6) return 'central';
+  if (n <= 10) return 'middle';
+  return 'outer';
+}
+function bedsFromLayout(layout) {
+  if (!layout) return null;
+  if (/garson|studio/i.test(layout)) return 0;
+  const m = layout.match(/^(\d+)/);
+  return m ? +m[1] : null;
+}
+function enrichListing(l) {
+  return {
+    ...l,
+    _tier: l.price_tier || computeTier(l.price_czk),
+    _ring: l.prague_ring || ringFromDistrict(l.district_name),
+    _beds: l.bedroom_count ?? bedsFromLayout(l.layout_type),
+  };
+}
+
+// ─── CONFIG ────────────────────────────────────────────────────────────────────
+const API = '';
+const FMT = {
+  czk: v => v==null?'n/a':Math.round(+v).toLocaleString('cs-CZ')+' Kč',
+  m:   v => v==null?'n/a':((+v)/1e6).toFixed(1)+' M Kč',
+  b:   v => v==null?'n/a':((+v)/1e9).toFixed(2)+' B Kč',
+  int: v => v==null?'n/a':Math.round(+v).toLocaleString('cs-CZ'),
+  pct: v => v==null?'':((+v)>0?'+':'')+(+v).toFixed(1)+'%',
+  day: v => v==null?'n/a':Math.round(+v)+' d',
+};
+
+// ─── MOCK DATA ─────────────────────────────────────────────────────────────────
 function makeMock() {
-  const districts = [
-    {n:'Praha 1',ppm2:175000,base:14000000}, {n:'Praha 2',ppm2:148000,base:9500000},
-    {n:'Praha 3',ppm2:118000,base:7200000},  {n:'Praha 4',ppm2:107000,base:6800000},
-    {n:'Praha 5',ppm2:119000,base:7600000},  {n:'Praha 6',ppm2:132000,base:9100000},
-    {n:'Praha 7',ppm2:124000,base:8200000},  {n:'Praha 8',ppm2:116000,base:7800000},
-    {n:'Praha 9',ppm2:95000, base:5400000},  {n:'Praha 10',ppm2:105000,base:6200000},
+  const districts=[
+    {n:'Praha 1',ppm2:175000},{n:'Praha 2',ppm2:148000},{n:'Praha 3',ppm2:118000},
+    {n:'Praha 4',ppm2:107000},{n:'Praha 5',ppm2:119000},{n:'Praha 6',ppm2:132000},
+    {n:'Praha 7',ppm2:124000},{n:'Praha 8',ppm2:116000},{n:'Praha 9',ppm2:95000},{n:'Praha 10',ppm2:105000},
   ];
-  const layouts = ['1+kk','2+kk','2+1','3+kk','3+1','4+kk'];
-  const types = ['byty','byty','byty','byty','domy','pozemky','komercni prostory'];
-  const sellers = ['agent','private','developer'];
-  const rings = {1:'inner',2:'inner',3:'central',4:'central',5:'central',6:'central',7:'middle',8:'middle',9:'middle',10:'outer'};
-  let id = 1;
-  function listing() {
-    const d = districts[Math.floor(Math.random()*districts.length)];
-    const layout = layouts[Math.floor(Math.random()*layouts.length)];
-    const area = 35 + Math.floor(Math.random()*130);
-    const price = Math.round(d.ppm2 * area * (0.85 + Math.random()*0.3) / 10000) * 10000;
-    const bedrooms = {'1+kk':1,'2+kk':2,'2+1':2,'3+kk':3,'3+1':3,'4+kk':4}[layout]||1;
-    const tier = price<5e6?'budget':price<10e6?'mid':price<20e6?'premium':'luxury';
-    const distNum = parseInt((d.n.match(/\d+/)||[0])[0]);
+  const layouts=['1+kk','2+kk','2+1','3+kk','3+1','4+kk'];
+  const types=['byty','byty','byty','byty','domy','pozemky','komercni prostory'];
+  const sellers=['agent','private','developer'];
+  const rings={1:'inner',2:'inner',3:'central',4:'central',5:'central',6:'central',7:'middle',8:'middle',9:'middle',10:'outer'};
+  let id=1;
+  function listing(){
+    const d=districts[Math.floor(Math.random()*districts.length)];
+    const layout=layouts[Math.floor(Math.random()*layouts.length)];
+    const area=35+Math.floor(Math.random()*130);
+    const price=Math.round(d.ppm2*area*(0.85+Math.random()*0.3)/10000)*10000;
+    const tier=computeTier(price);
+    const dn=parseInt((d.n.match(/\d+/)||[0])[0]);
     return {
-      composite_id: 'mock_' + (id++),
-      source: 'sreality',
-      property_type: types[Math.floor(Math.random()*types.length)],
-      district_name: d.n, borough_name: d.n,
-      title: `Prodej bytu ${layout}, ${area} m², ${d.n}`,
-      layout_type: layout, area_m2: area, bedroom_count: bedrooms,
-      price_czk: price, price_per_m2_czk: Math.round(price/area),
-      price_tier: tier,
-      prague_ring: rings[distNum]||'outer',
-      is_new_build: Math.random()<0.2,
-      seller_type: sellers[Math.floor(Math.random()*sellers.length)],
-      listing_duration_days: Math.floor(Math.random()*90),
-      is_active: true, property_link: '#',
+      composite_id:'mock_'+(id++),source:'sreality',
+      property_type:types[Math.floor(Math.random()*types.length)],
+      district_name:d.n,title:`Prodej bytu ${layout}, ${area} m², ${d.n}`,
+      layout_type:layout,area_m2:area,price_czk:price,price_per_m2_czk:Math.round(price/area),
+      price_tier:tier,prague_ring:rings[dn]||'outer',bedroom_count:bedsFromLayout(layout),
+      seller_type:sellers[Math.floor(Math.random()*sellers.length)],
+      listing_duration_days:Math.floor(Math.random()*120),is_active:true,property_link:'#',
     };
   }
-  const listings = Array.from({length:230}, listing);
-  const timeseries = [
+  const listings=Array.from({length:230},listing);
+  const ts=[
     {snapshot_date:'2026-04-27',active_listings:214,median_price_czk:10800000,median_price_per_m2_czk:112000,new_listings:214,removed_listings:0,price_increases:0,price_reductions:0},
     {snapshot_date:'2026-04-28',active_listings:220,median_price_czk:11100000,median_price_per_m2_czk:114500,new_listings:18,removed_listings:12,price_increases:5,price_reductions:8},
     {snapshot_date:'2026-04-29',active_listings:230,median_price_czk:10990000,median_price_per_m2_czk:115800,new_listings:14,removed_listings:6,price_increases:4,price_reductions:6},
   ];
-  const curr = timeseries[2], prev = timeseries[1];
-  const distData = districts.map(d => {
-    const ds = listings.filter(l=>l.district_name===d.n);
-    const prices = ds.map(l=>l.price_per_m2_czk).sort((a,b)=>a-b);
-    return {district_name:d.n, active_listings:ds.length, median_price_per_m2_czk: prices[Math.floor(prices.length/2)]||0};
+  const curr=ts[2],prev=ts[1];
+  const distData=districts.map(d=>{
+    const ds=listings.filter(l=>l.district_name===d.n);
+    const prices=ds.map(l=>l.price_per_m2_czk).sort((a,b)=>a-b);
+    return{district_name:d.n,active_listings:ds.length,median_price_per_m2_czk:prices[Math.floor(prices.length/2)]||0};
   });
-  return {
+  return{
     overview:{
-      latest_snapshot_date:'2026-04-29', previous_snapshot_date:'2026-04-28',
-      active_listings:{current:curr.active_listings,previous:prev.active_listings,delta:curr.active_listings-prev.active_listings,pct_change:2.3},
+      latest_snapshot_date:'2026-04-29',previous_snapshot_date:'2026-04-28',
+      active_listings:{current:curr.active_listings,previous:prev.active_listings,delta:10,pct_change:2.3},
       total_market_value:{current:2.45e9,previous:2.38e9,delta:7e7,pct_change:2.9},
-      median_listing_price:{current:curr.median_price_czk,previous:prev.median_price_czk,delta:curr.median_price_czk-prev.median_price_czk,pct_change:-0.99},
+      median_listing_price:{current:curr.median_price_czk,previous:prev.median_price_czk,delta:-110000,pct_change:-0.99},
       median_price_per_sqm:{current:curr.median_price_per_m2_czk,previous:prev.median_price_per_m2_czk,delta:1300,pct_change:1.14},
-      new_listings:curr.new_listings, removed_listings:curr.removed_listings,
-      price_reductions:curr.price_reductions, price_increases:curr.price_increases,
-      days_on_market_avg:47, days_on_market_median:38,
+      new_listings:curr.new_listings,removed_listings:curr.removed_listings,
+      price_reductions:curr.price_reductions,price_increases:curr.price_increases,days_on_market_avg:47,
     },
-    timeseries, districts:distData, listings,
-    movements: [
+    timeseries:ts,districts:distData,listings,
+    movements:[
       ...listings.slice(224).map(l=>({...l,movement:'new'})),
       ...listings.slice(210,218).map(l=>({...l,movement:'removed'})),
       ...listings.slice(50,56).map(l=>({...l,movement:'price_reduction',price_change_pct:-4.2})),
@@ -316,243 +456,240 @@ function makeMock() {
   };
 }
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let DATA = null;
-let listings = [], filteredListings = [];
-let sortCol = 'listing_duration_days', sortAsc = true;
-let page = 1; const PER_PAGE = 50;
-let movFilter = 'all';
-let charts = {};
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+let DATA=null, listings=[], filteredListings=[];
+let sortCol='listing_duration_days', sortAsc=true, page=1;
+const PER_PAGE=50;
+let movFilter='all', charts={};
 
-// ─── CHART HELPERS ────────────────────────────────────────────────────────────
-const CHART_DEFAULTS = {
+// ─── CHART HELPERS ─────────────────────────────────────────────────────────────
+const CD={
   plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1526',borderColor:'rgba(107,143,255,0.3)',borderWidth:1,titleColor:'#e8efff',bodyColor:'#8fa3cc',padding:10}},
   scales:{x:{grid:{color:'rgba(92,120,200,0.08)'},ticks:{color:'#5a6e96',font:{size:11}}},
           y:{grid:{color:'rgba(92,120,200,0.08)'},ticks:{color:'#5a6e96',font:{size:11}}}},
   animation:{duration:400},
 };
-function makeChart(id, type, data, extra={}) {
-  if (typeof Chart === 'undefined') return; // CDN blocked/slow — skip silently
-  if (charts[id]) charts[id].destroy();
-  const ctx = document.getElementById(id);
-  if (!ctx) return;
-  try {
-    const cartesian = !['doughnut','pie','polarArea','radar'].includes(type);
-    const base = cartesian ? CHART_DEFAULTS : {animation:CHART_DEFAULTS.animation}; // no scales for non-cartesian
-    const options = {...base, ...extra, plugins:{...CHART_DEFAULTS.plugins,...(extra.plugins||{})}};
-    if (!cartesian) delete options.scales;
-    charts[id] = new Chart(ctx, {type, data, options});
-  } catch(e) { console.warn('[Chart]', id, e.message); }
+function makeChart(id,type,data,extra={}){
+  if(typeof Chart==='undefined') return;
+  if(charts[id]) charts[id].destroy();
+  const ctx=document.getElementById(id);
+  if(!ctx) return;
+  const cartesian=!['doughnut','pie','polarArea','radar'].includes(type);
+  const base=cartesian?CD:{animation:CD.animation};
+  try{
+    const opts={...base,...extra,plugins:{...CD.plugins,...(extra.plugins||{})}};
+    if(!cartesian) delete opts.scales;
+    charts[id]=new Chart(ctx,{type,data,options:opts});
+  }catch(e){console.warn('[Chart]',id,e.message);}
 }
 
-// ─── RENDER ───────────────────────────────────────────────────────────────────
-function renderKPIs(ov) {
-  function kpiHtml(label, metric, fmt) {
-    const {current,delta,pct_change} = metric||{};
-    const up=delta>0,dn=delta<0;
-    const col=up?'var(--green)':dn?'var(--red)':'var(--yellow)';
-    const arrow=up?'↑':dn?'↓':'→';
-    const deltaHtml = delta!=null
-      ? `<div class="delta" style="color:${col}">${arrow} ${fmt(Math.abs(delta))} <span style="color:var(--t3);font-size:11px">(${FMT.pct(pct_change)})</span></div>`
-      : `<div class="note">Only one snapshot — run pipeline again for deltas</div>`;
-    return `<div class="kpi"><div class="lbl">${label}</div><div class="val">${fmt(current)}</div>${deltaHtml}</div>`;
+// ─── RENDER: KPIs ──────────────────────────────────────────────────────────────
+function renderKPIs(ov){
+  function kpiHtml(key,metric,fmt){
+    const{current,delta,pct_change}=metric||{};
+    const up=delta>0,dn=delta<0,col=up?'var(--green)':dn?'var(--red)':'var(--yellow)',arr=up?'↑':dn?'↓':'→';
+    const dHtml=delta!=null
+      ?`<div class="delta" style="color:${col}">${arr} ${fmt(Math.abs(delta))} <span style="color:var(--t3);font-size:11px">(${FMT.pct(pct_change)})</span></div>`
+      :`<div class="note">${t('snapshot.only_one')}</div>`;
+    return`<div class="kpi"><div class="lbl">${t(key)}</div><div class="val">${fmt(current)}</div>${dHtml}</div>`;
   }
-  document.getElementById('kpi-row1').innerHTML = [
-    kpiHtml('Active Listings', ov.active_listings, FMT.int),
-    kpiHtml('Total Market Value', ov.total_market_value, FMT.b),
-    kpiHtml('Median Listing Price', ov.median_listing_price, FMT.m),
-    kpiHtml('Median Price / m²', ov.median_price_per_sqm, v => v ? FMT.int(v)+' Kč/m²' : 'n/a'),
+  document.getElementById('kpi-row1').innerHTML=[
+    kpiHtml('kpi.active',ov.active_listings,FMT.int),
+    kpiHtml('kpi.value',ov.total_market_value,FMT.b),
+    kpiHtml('kpi.price',ov.median_listing_price,FMT.m),
+    kpiHtml('kpi.ppm2',ov.median_price_per_sqm,v=>v?FMT.int(v)+' Kč/m²':'n/a'),
   ].join('');
-  function simpleKpi(label, value, fmt, color) {
-    return `<div class="simple-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${fmt(value)}</div></div>`;
+  function sKpi(key,val,fmt,color){
+    return`<div class="simple-kpi"><div class="lbl">${t(key)}</div><div class="val" style="color:${color}">${fmt(val)}</div></div>`;
   }
-  document.getElementById('kpi-row2').innerHTML = [
-    simpleKpi('New Listings', ov.new_listings, v=>`+${FMT.int(v)}`, 'var(--green)'),
-    simpleKpi('Removed Listings', ov.removed_listings, v=>`-${FMT.int(v)}`, 'var(--red)'),
-    simpleKpi('Price Reductions', ov.price_reductions, v=>`${FMT.int(v)} listings`, 'var(--yellow)'),
-    simpleKpi('Avg Days on Market', ov.days_on_market_avg, FMT.day, 'var(--blue)'),
+  document.getElementById('kpi-row2').innerHTML=[
+    sKpi('kpi.new',ov.new_listings,v=>`+${FMT.int(v)}`,'var(--green)'),
+    sKpi('kpi.removed',ov.removed_listings,v=>`-${FMT.int(v)}`,'var(--red)'),
+    sKpi('kpi.reductions',ov.price_reductions,v=>`${FMT.int(v)}`,'var(--yellow)'),
+    sKpi('kpi.days',ov.days_on_market_avg,FMT.day,'var(--blue)'),
   ].join('');
 }
 
-function renderCharts(timeseries, districts) {
-  const labels = timeseries.map(t=>t.snapshot_date);
-  const blu = 'rgba(107,143,255,', grn = 'rgba(110,231,183,';
-  makeChart('chart-inventory','line',{
-    labels,
-    datasets:[{label:'Active Listings',data:timeseries.map(t=>t.active_listings),borderColor:'#6b8fff',backgroundColor:'rgba(107,143,255,0.08)',fill:true,tension:.4,pointRadius:4}]
-  });
-  makeChart('chart-price','line',{
-    labels,
-    datasets:[{label:'Median Price (Kč)',data:timeseries.map(t=>t.median_price_czk),borderColor:'#f7d47c',backgroundColor:'rgba(247,212,124,0.08)',fill:true,tension:.4,pointRadius:4}]
-  },{scales:{...CHART_DEFAULTS.scales,y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}}});
-
-  const topD = [...districts].sort((a,b)=>b.active_listings-a.active_listings).slice(0,12);
-  makeChart('chart-district-count','bar',{
-    labels:topD.map(d=>d.district_name),
-    datasets:[{data:topD.map(d=>d.active_listings),backgroundColor:'rgba(107,143,255,0.7)',borderRadius:4}]
-  },{indexAxis:'y',scales:{x:{...CHART_DEFAULTS.scales.x},y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,font:{size:11}}}}});
-
-  const topP = [...districts].filter(d=>d.median_price_per_m2_czk).sort((a,b)=>b.median_price_per_m2_czk-a.median_price_per_m2_czk).slice(0,12);
-  makeChart('chart-district-price','bar',{
-    labels:topP.map(d=>d.district_name),
-    datasets:[{data:topP.map(d=>d.median_price_per_m2_czk),backgroundColor:'rgba(110,231,183,0.7)',borderRadius:4}]
-  },{indexAxis:'y',scales:{x:{...CHART_DEFAULTS.scales.x,ticks:{...CHART_DEFAULTS.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,font:{size:11}}}}});
+// ─── RENDER: MARKET TRENDS ────────────────────────────────────────────────────
+function renderCharts(timeseries,districts){
+  const labels=timeseries.map(t=>t.snapshot_date);
+  makeChart('chart-inventory','line',{labels,datasets:[{label:t('kpi.active'),data:timeseries.map(r=>r.active_listings),borderColor:'#6b8fff',backgroundColor:'rgba(107,143,255,0.08)',fill:true,tension:.4,pointRadius:4}]});
+  makeChart('chart-price','line',{labels,datasets:[{label:t('kpi.price'),data:timeseries.map(r=>r.median_price_czk),borderColor:'#f7d47c',backgroundColor:'rgba(247,212,124,0.08)',fill:true,tension:.4,pointRadius:4}]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}}});
+  const topD=[...districts].sort((a,b)=>b.active_listings-a.active_listings).slice(0,12);
+  makeChart('chart-district-count','bar',{labels:topD.map(d=>d.district_name),datasets:[{data:topD.map(d=>d.active_listings),backgroundColor:'rgba(107,143,255,0.7)',borderRadius:4}]},{indexAxis:'y',scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
+  const topP=[...districts].filter(d=>d.median_price_per_m2_czk).sort((a,b)=>b.median_price_per_m2_czk-a.median_price_per_m2_czk).slice(0,12);
+  makeChart('chart-district-price','bar',{labels:topP.map(d=>d.district_name),datasets:[{data:topP.map(d=>d.median_price_per_m2_czk),backgroundColor:'rgba(110,231,183,0.7)',borderRadius:4}]},{indexAxis:'y',scales:{x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
 }
 
-function renderPropertyBreakdown(allListings) {
-  const typeColors = ['rgba(107,143,255,0.8)','rgba(110,231,183,0.8)','rgba(247,212,124,0.8)','rgba(167,139,250,0.8)','rgba(255,112,112,0.8)','rgba(94,202,220,0.8)'];
-  const grouped = {};
-  allListings.forEach(l => {
-    const t = l.property_type||'unknown';
-    if (!grouped[t]) grouped[t] = [];
-    grouped[t].push(l);
-  });
-  const types = Object.keys(grouped).sort((a,b) => grouped[b].length - grouped[a].length);
-  const counts = types.map(t => grouped[t].length);
-  const medians = types.map(t => {
-    const prices = grouped[t].map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b);
-    return prices.length ? prices[Math.floor(prices.length/2)] : 0;
-  });
+// ─── RENDER: PROPERTY TYPE BREAKDOWN ─────────────────────────────────────────
+function renderPropertyBreakdown(all){
+  const colors=['rgba(107,143,255,0.85)','rgba(110,231,183,0.85)','rgba(247,212,124,0.85)','rgba(167,139,250,0.85)','rgba(255,112,112,0.85)','rgba(94,202,220,0.85)'];
+  const grouped={};
+  all.forEach(l=>{ const k=l.property_type||'unknown'; (grouped[k]=grouped[k]||[]).push(l); });
+  const types=Object.keys(grouped).sort((a,b)=>grouped[b].length-grouped[a].length);
+  const counts=types.map(k=>grouped[k].length);
+  const medians=types.map(k=>{ const ps=grouped[k].map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b); return ps.length?ps[Math.floor(ps.length/2)]:0; });
+  const labels=types.map(k=>tv('type',k));
 
-  const DOUGHNUT_OPTS = {
-    plugins:{legend:{display:true,position:'right',labels:{color:'#8fa3cc',font:{size:11},boxWidth:12,padding:8}}},
-    animation:{duration:400},
-  };
-  makeChart('chart-type-count','doughnut',{
-    labels: types,
-    datasets:[{data:counts, backgroundColor:typeColors, borderWidth:1, borderColor:'rgba(0,0,0,0.2)'}]
-  }, DOUGHNUT_OPTS);
+  makeChart('chart-type-count','doughnut',{labels,datasets:[{data:counts,backgroundColor:colors,borderWidth:1,borderColor:'rgba(0,0,0,0.25)'}]},
+    {plugins:{legend:{display:true,position:'right',labels:{color:'#8fa3cc',font:{size:11},boxWidth:12,padding:8}}}});
+  makeChart('chart-type-price','bar',{labels,datasets:[{data:medians,backgroundColor:colors,borderRadius:5}]},
+    {scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}},plugins:{...CD.plugins}});
 
-  makeChart('chart-type-price','bar',{
-    labels: types,
-    datasets:[{
-      label:'Median Price',
-      data: medians,
-      backgroundColor: typeColors,
-      borderRadius: 5,
-    }]
-  },{
-    scales:{
-      x:{...CHART_DEFAULTS.scales.x},
-      y:{...CHART_DEFAULTS.scales.y, ticks:{...CHART_DEFAULTS.scales.y.ticks, callback:v=>(v/1e6).toFixed(1)+'M'}}
-    },
-    plugins:{...CHART_DEFAULTS.plugins, legend:{display:false}},
-  });
-
-  const tierColors = {budget:'var(--green)',mid:'var(--blue)',premium:'var(--yellow)',luxury:'var(--purple)'};
-  document.getElementById('type-stats-body').innerHTML = types.map((t,i) => {
-    const items = grouped[t];
-    const prices = items.map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b);
-    const med = prices.length ? prices[Math.floor(prices.length/2)] : null;
-    const avgArea = items.reduce((s,l)=>s+(l.area_m2||0),0) / (items.filter(l=>l.area_m2).length||1);
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="width:10px;height:10px;border-radius:50%;background:${typeColors[i%typeColors.length]};flex-shrink:0"></div>
-      <div style="flex:1;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t}</div>
-      <div style="font-size:12px;color:var(--blue);font-weight:600">${items.length}</div>
-      <div style="font-size:11px;color:var(--t3);min-width:60px;text-align:right">${med!=null?FMT.m(med):'n/a'}</div>
+  document.getElementById('type-stats-body').innerHTML=types.map((k,i)=>{
+    const items=grouped[k];
+    const ps=items.map(l=>+l.price_czk).filter(p=>p>0).sort((a,b)=>a-b);
+    const med=ps.length?ps[Math.floor(ps.length/2)]:null;
+    return`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:10px;height:10px;border-radius:50%;background:${colors[i%colors.length]};flex-shrink:0"></div>
+      <div style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${tv('type',k)}</div>
+      <div style="font-size:12px;color:var(--blue);font-weight:700;min-width:28px;text-align:right">${items.length}</div>
+      <div style="font-size:11px;color:var(--t3);min-width:64px;text-align:right">${med!=null?FMT.m(med):'n/a'}</div>
     </div>`;
-  }).join('') + `<div style="font-size:11px;color:var(--t3);padding-top:8px">count · median price</div>`;
+  }).join('')+`<div style="font-size:11px;color:var(--t3);padding-top:8px">${t('stats.count_median')}</div>`;
 }
 
-function tierBadge(tier) {
-  const m = {budget:'badge-green',mid:'badge-blue',premium:'badge-yellow',luxury:'badge-purple'};
-  return tier ? `<span class="badge ${m[tier]||'badge-blue'}">${tier}</span>` : '-';
+// ─── RENDER: INVESTOR SIGNALS ──────────────────────────────────────────────────
+function renderInvestorSignals(all,timeseries){
+  // 1. Days on Market buckets
+  const dom={fresh:0,active:0,stale:0,stuck:0};
+  all.forEach(l=>{ const d=+l.listing_duration_days||0; if(d<=7)dom.fresh++;else if(d<=30)dom.active++;else if(d<=90)dom.stale++;else dom.stuck++; });
+  makeChart('chart-dom','bar',{
+    labels:[t('dom.fresh'),t('dom.active'),t('dom.stale'),t('dom.stuck')],
+    datasets:[{data:[dom.fresh,dom.active,dom.stale,dom.stuck],
+      backgroundColor:['rgba(110,231,183,0.8)','rgba(107,143,255,0.8)','rgba(247,212,124,0.8)','rgba(255,112,112,0.8)'],borderRadius:5}]
+  },{scales:{x:{...CD.scales.x},y:{...CD.scales.y}},plugins:{...CD.plugins}});
+
+  // 2. Price tier mix (computed on-the-fly if price_tier missing)
+  const tierCounts={budget:0,mid:0,premium:0,luxury:0};
+  all.forEach(l=>{ const tier=l._tier||computeTier(l.price_czk); if(tier) tierCounts[tier]++; });
+  const tierLabels=['budget','mid','premium','luxury'];
+  makeChart('chart-tier','doughnut',{
+    labels:tierLabels.map(k=>tv('tier',k)),
+    datasets:[{data:tierLabels.map(k=>tierCounts[k]),
+      backgroundColor:['rgba(110,231,183,0.85)','rgba(107,143,255,0.85)','rgba(247,212,124,0.85)','rgba(167,139,250,0.85)'],borderWidth:1,borderColor:'rgba(0,0,0,0.2)'}]
+  },{plugins:{legend:{display:true,position:'right',labels:{color:'#8fa3cc',font:{size:11},boxWidth:12,padding:8}}}});
+
+  // 3. Supply flow: new vs removed over snapshots
+  if(timeseries&&timeseries.length){
+    const labels=timeseries.map(r=>r.snapshot_date);
+    makeChart('chart-flow','bar',{labels,datasets:[
+      {label:t('kpi.new'),data:timeseries.map(r=>r.new_listings||0),backgroundColor:'rgba(110,231,183,0.7)',borderRadius:3},
+      {label:t('kpi.removed'),data:timeseries.map(r=>r.removed_listings||0),backgroundColor:'rgba(255,112,112,0.7)',borderRadius:3},
+    ]},{
+      scales:{x:{...CD.scales.x},y:{...CD.scales.y}},
+      plugins:{...CD.plugins,legend:{display:true,position:'top',labels:{color:'#8fa3cc',font:{size:11},boxWidth:10,padding:8}}},
+    });
+  }
 }
 
-function movBadge(t) {
+// ─── RENDER: MOVEMENTS ────────────────────────────────────────────────────────
+function movBadge(tp){
   const m={new:'badge-green',removed:'badge-red',price_reduction:'badge-yellow',price_increase:'badge-blue'};
-  const l={new:'New',removed:'Removed',price_reduction:'Price ↓',price_increase:'Price ↑'};
-  return `<span class="badge ${m[t]||'badge-blue'}">${l[t]||t}</span>`;
+  return`<span class="badge ${m[tp]||'badge-blue'}">${t('mov.'+tp)||tp}</span>`;
 }
-
-function renderMovements(movements) {
-  const types = ['all','new','removed','price_reduction','price_increase'];
-  const filt = movFilter==='all' ? movements : movements.filter(m=>m.movement===movFilter);
-  document.getElementById('movement-filters').innerHTML = types.map(t=>
-    `<button class="btn btn-sm${movFilter===t?' ':' '}" style="${movFilter===t?'border-color:var(--blue);background:rgba(107,143,255,0.25)':''}" onclick="setMovFilter('${t}')">${t==='all'?'All':t.replace('_',' ')}</button>`
+function renderMovements(movements){
+  const types=['all','new','removed','price_reduction','price_increase'];
+  document.getElementById('movement-filters').innerHTML=types.map(tp=>
+    `<button class="btn btn-sm${movFilter===tp?' btn-active':''}" style="${movFilter===tp?'border-color:var(--blue);background:rgba(107,143,255,0.25)':''}" onclick="setMovFilter('${tp}')">${t('mov.'+tp)}</button>`
   ).join('');
-  document.getElementById('movements-body').innerHTML = filt.slice(0,40).map(m=>`<tr>
+  const filt=movFilter==='all'?movements:movements.filter(m=>m.movement===movFilter);
+  document.getElementById('movements-body').innerHTML=filt.slice(0,40).map(m=>`<tr>
     <td>${movBadge(m.movement)}</td>
     <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${m.title||''}">${m.title||'-'}</td>
     <td>${m.district_name||'-'}</td>
     <td>${FMT.czk(m.price_czk)}</td>
-    <td style="color:${m.price_change_pct<0?'var(--red)':m.price_change_pct>0?'var(--green)':'var(--t2)'}">${m.price_change_pct!=null?(m.price_change_pct>0?'+':'')+m.price_change_pct.toFixed(1)+'%':'-'}</td>
+    <td style="color:${m.price_change_pct<0?'var(--red)':m.price_change_pct>0?'var(--green)':'var(--t2)'}">${m.price_change_pct!=null?(m.price_change_pct>0?'+':'')+Number(m.price_change_pct).toFixed(1)+'%':'-'}</td>
     <td>${FMT.day(m.listing_duration_days)}</td>
   </tr>`).join('');
 }
+function setMovFilter(f){ movFilter=f; renderMovements(DATA.movements); }
 
-function setMovFilter(f) { movFilter=f; renderMovements(DATA.movements); }
+// ─── RENDER: LISTINGS TABLE ───────────────────────────────────────────────────
+function renderListingsHead(){
+  const cols=[
+    {k:'title',i:'col.title'},{k:'district_name',i:'col.district'},{k:'_ring',i:'col.zone'},
+    {k:'layout_type',i:'col.layout'},{k:'area_m2',i:'col.area'},{k:'price_czk',i:'col.asking_price'},
+    {k:'price_per_m2_czk',i:'col.ppm2'},{k:'_tier',i:'col.tier'},{k:'listing_duration_days',i:'col.on_market'},
+    {k:'__link',i:'col.link'},
+  ];
+  document.getElementById('listings-thead').innerHTML=cols.map(c=>
+    c.k==='__link'
+      ?`<th>${t(c.i)}</th>`
+      :`<th onclick="sortListings('${c.k}')">${t(c.i)} ${sortCol===c.k?(sortAsc?'↑':'↓'):'↕'}</th>`
+  ).join('');
+}
+function tierBadge(tier){
+  if(!tier) return '-';
+  const m={budget:'badge-green',mid:'badge-blue',premium:'badge-yellow',luxury:'badge-purple'};
+  return`<span class="badge ${m[tier]||'badge-blue'}">${tv('tier',tier)}</span>`;
+}
+function renderListings(){
+  const search=document.getElementById('search-input').value.toLowerCase();
+  const dist=document.getElementById('filter-district').value;
+  const type=document.getElementById('filter-type').value;
+  const ring=document.getElementById('filter-ring').value;
+  const seller=document.getElementById('filter-seller').value;
+  const beds=document.getElementById('filter-bedrooms').value;
+  const tier=document.getElementById('filter-tier').value;
+  const pMin=+document.getElementById('filter-price-min').value||0;
+  const pMax=+document.getElementById('filter-price-max').value||Infinity;
+  const aMin=+document.getElementById('filter-area-min').value||0;
+  const aMax=+document.getElementById('filter-area-max').value||Infinity;
+  const nb=document.getElementById('filter-newbuild').value;
 
-function renderListings() {
-  const search   = document.getElementById('search-input').value.toLowerCase();
-  const dist     = document.getElementById('filter-district').value;
-  const type     = document.getElementById('filter-type').value;
-  const ring     = document.getElementById('filter-ring').value;
-  const seller   = document.getElementById('filter-seller').value;
-  const beds     = document.getElementById('filter-bedrooms').value;
-  const tier     = document.getElementById('filter-tier').value;
-  const pMin     = +document.getElementById('filter-price-min').value || 0;
-  const pMax     = +document.getElementById('filter-price-max').value || Infinity;
-  const aMin     = +document.getElementById('filter-area-min').value || 0;
-  const aMax     = +document.getElementById('filter-area-max').value || Infinity;
-  const newbuild = document.getElementById('filter-newbuild').value;
-
-  filteredListings = listings.filter(l => {
-    if (search && !(l.title||'').toLowerCase().includes(search) && !(l.district_name||'').toLowerCase().includes(search)) return false;
-    if (dist   && l.district_name!==dist)   return false;
-    if (type   && l.property_type!==type)   return false;
-    if (ring   && l.prague_ring!==ring)     return false;
-    if (seller && l.seller_type!==seller)   return false;
-    if (tier   && l.price_tier!==tier)      return false;
-    if (beds !== '') {
-      const b = l.bedroom_count??0;
-      if (beds==='0' && !(b===0||b===1&&l.layout_type&&l.layout_type.includes('kk'))) return false;
-      if (beds==='4' && b<4) return false;
-      if (beds!=='0'&&beds!=='4' && b!==+beds) return false;
-    }
-    if (l.price_czk!=null && (l.price_czk<pMin || l.price_czk>pMax)) return false;
-    if (l.area_m2!=null  && (l.area_m2<aMin   || l.area_m2>aMax))   return false;
-    if (newbuild==='1' && !l.is_new_build) return false;
-    if (newbuild==='0' && l.is_new_build)  return false;
+  filteredListings=listings.filter(l=>{
+    if(search&&!(l.title||'').toLowerCase().includes(search)&&!(l.district_name||'').toLowerCase().includes(search)) return false;
+    if(dist&&l.district_name!==dist) return false;
+    if(type&&l.property_type!==type) return false;
+    if(ring&&l._ring!==ring) return false;
+    if(seller&&l.seller_type!==seller) return false;
+    if(tier&&l._tier!==tier) return false;
+    if(beds==='studio'&&l._beds!==0&&l._beds!==1) return false;
+    if(beds==='2'&&l._beds!==2) return false;
+    if(beds==='3'&&l._beds!==3) return false;
+    if(beds==='4'&&(l._beds==null||l._beds<4)) return false;
+    const p=+l.price_czk;
+    if(p&&(p<pMin||p>pMax)) return false;
+    const a=+l.area_m2;
+    if(a&&(a<aMin||a>aMax)) return false;
+    if(nb==='1'&&!l.is_new_build) return false;
+    if(nb==='0'&&l.is_new_build) return false;
     return true;
   });
-
   filteredListings.sort((a,b)=>{
-    const av=a[sortCol], bv=b[sortCol];
+    let av=a[sortCol],bv=b[sortCol];
+    if(sortCol==='_ring') { av=a._ring; bv=b._ring; }
+    if(sortCol==='_tier') { av=a._tier; bv=b._tier; }
     if(av==null) return 1; if(bv==null) return -1;
-    return sortAsc ? (av>bv?1:-1) : (av<bv?1:-1);
+    return sortAsc?(av>bv?1:-1):(av<bv?1:-1);
   });
-
-  const total = filteredListings.length;
-  const pages = Math.max(1, Math.ceil(total/PER_PAGE));
-  if(page > pages) page = pages;
-  const slice = filteredListings.slice((page-1)*PER_PAGE, page*PER_PAGE);
-
-  document.getElementById('page-info').textContent = `${total} listings · page ${page} of ${pages}`;
-  document.getElementById('btn-prev').disabled = page <= 1;
-  document.getElementById('btn-next').disabled = page >= pages;
-
-  document.getElementById('listings-body').innerHTML = slice.map(l => {
-    const pctHtml = l.price_change_pct!=null
-      ? `<span style="font-size:11px;color:${l.price_change_pct<0?'var(--red)':'var(--green)'}"> (${l.price_change_pct>0?'+':''}${l.price_change_pct.toFixed(1)}%)</span>` : '';
-    return `<tr>
-      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
+  const total=filteredListings.length, pages=Math.max(1,Math.ceil(total/PER_PAGE));
+  if(page>pages) page=pages;
+  const slice=filteredListings.slice((page-1)*PER_PAGE,page*PER_PAGE);
+  document.getElementById('page-info').textContent=`${total} · ${page}/${pages}`;
+  document.getElementById('btn-prev').disabled=page<=1;
+  document.getElementById('btn-next').disabled=page>=pages;
+  renderListingsHead();
+  document.getElementById('listings-body').innerHTML=slice.map(l=>{
+    const pHtml=l.price_change_pct!=null?`<span style="font-size:11px;color:${l.price_change_pct<0?'var(--red)':'var(--green)'};margin-left:4px">(${l.price_change_pct>0?'+':''}${Number(l.price_change_pct).toFixed(1)}%)</span>`:'';
+    return`<tr>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
       <td>${l.district_name||'-'}</td>
-      <td style="font-size:11px;color:var(--t3)">${l.prague_ring||'-'}</td>
+      <td style="font-size:11px;color:var(--t3)">${l._ring?tv('ring',l._ring):'-'}</td>
       <td>${l.layout_type||'-'}</td>
       <td>${l.area_m2!=null?l.area_m2+' m²':'-'}</td>
-      <td>${FMT.czk(l.price_czk)}${pctHtml}</td>
+      <td>${FMT.czk(l.price_czk)}${pHtml}</td>
       <td>${l.price_per_m2_czk!=null?FMT.int(l.price_per_m2_czk)+' Kč/m²':'-'}</td>
-      <td>${tierBadge(l.price_tier)}</td>
+      <td>${tierBadge(l._tier)}</td>
       <td>${FMT.day(l.listing_duration_days)}</td>
-      <td>${l.property_link&&l.property_link!=='#'?`<a href="${l.property_link}" target="_blank">View →</a>`:'-'}</td>
+      <td>${l.property_link&&l.property_link!=='#'?`<a href="${l.property_link}" target="_blank">${t('col.link')} →</a>`:'-'}</td>
     </tr>`;
   }).join('');
 }
-
-function sortListings(col) { if(sortCol===col) sortAsc=!sortAsc; else{sortCol=col;sortAsc=true;} page=1; renderListings(); }
-function changePage(d) { page+=d; renderListings(); }
-function resetFilters() {
+function sortListings(col){ if(sortCol===col)sortAsc=!sortAsc;else{sortCol=col;sortAsc=true;} page=1; renderListings(); }
+function changePage(d){ page+=d; renderListings(); }
+function resetFilters(){
   ['search-input','filter-district','filter-type','filter-ring','filter-seller',
    'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
    'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
@@ -561,117 +698,112 @@ function resetFilters() {
   page=1; renderListings();
 }
 
-function populateFilterOptions(listings) {
-  const districts = [...new Set(listings.map(l=>l.district_name).filter(Boolean))].sort();
-  const types     = [...new Set(listings.map(l=>l.property_type).filter(Boolean))].sort();
-  const sellers   = [...new Set(listings.map(l=>l.seller_type).filter(Boolean))].sort();
+// ─── RENDER: FILTER DROPDOWNS ─────────────────────────────────────────────────
+function populateFilterOptions(all){
+  const districts=[...new Set(all.map(l=>l.district_name).filter(Boolean))].sort();
+  const types=[...new Set(all.map(l=>l.property_type).filter(Boolean))].sort();
+  const sellers=[...new Set(all.map(l=>l.seller_type).filter(Boolean))].sort();
   const ds=document.getElementById('filter-district');
-  districts.forEach(d=>{const o=document.createElement('option');o.value=o.textContent=d;ds.appendChild(o);});
   const ts=document.getElementById('filter-type');
-  types.forEach(t=>{const o=document.createElement('option');o.value=o.textContent=t;ts.appendChild(o);});
   const ss=document.getElementById('filter-seller');
-  sellers.forEach(s=>{const o=document.createElement('option');o.value=o.textContent=s;ss.appendChild(o);});
+  // clear existing non-default options
+  [ds,ts,ss].forEach(el=>{ while(el.options.length>1) el.remove(1); });
+  districts.forEach(d=>{const o=document.createElement('option');o.value=o.textContent=d;ds.appendChild(o);});
+  types.forEach(tp=>{const o=document.createElement('option');o.value=tp;o.textContent=tv('type',tp);ts.appendChild(o);});
+  sellers.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=tv('seller',s);ss.appendChild(o);});
 }
 
-function renderQuality(q) {
-  const total = q.total_records||1;
-  function qrow(label, count, color) {
-    const pct = (count/total*100).toFixed(1);
-    return `<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="width:200px;font-size:13px;color:var(--t2)">${label}</div>
+// ─── RENDER: DATA QUALITY ──────────────────────────────────────────────────────
+function renderQuality(q){
+  const total=q.total_records||1;
+  function qrow(key,count,color){
+    const pct=(count/total*100).toFixed(1);
+    return`<div class="qrow">
+      <div style="width:200px;font-size:13px;color:var(--t2)">${t(key)}</div>
       <div style="flex:1;background:rgba(92,120,200,0.1);border-radius:4px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div></div>
       <div style="width:60px;text-align:right;font-size:12px;color:var(--t3)">${count} (${pct}%)</div>
     </div>`;
   }
-  document.getElementById('quality-panel').innerHTML = `
-    <div style="font-size:13px;font-weight:600;margin-bottom:12px">Coverage: <span style="color:var(--green)">${q.active_records}</span> active / <span style="color:var(--t2)">${q.total_records}</span> total records</div>
-    ${qrow('Missing price', q.missing_price||0, 'var(--red)')}
-    ${qrow('Missing area', q.missing_area||0, 'var(--yellow)')}
-    ${qrow('Missing coordinates', q.missing_coordinates||0, 'var(--yellow)')}
-    ${qrow('Location quality issues', q.location_issues||0, 'var(--purple)')}
-  `;
+  document.getElementById('quality-panel').innerHTML=`
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px">${t('quality.coverage')}: <span style="color:var(--green)">${q.active_records}</span> ${t('quality.active')} / <span style="color:var(--t2)">${q.total_records}</span> ${t('quality.total')}</div>
+    ${qrow('quality.missing_price',q.missing_price||0,'var(--red)')}
+    ${qrow('quality.missing_area',q.missing_area||0,'var(--yellow)')}
+    ${qrow('quality.missing_coords',q.missing_coordinates||0,'var(--yellow)')}
+    ${qrow('quality.location_issues',q.location_issues||0,'var(--purple)')}`;
 }
 
-function _mount(d, status) {
-  DATA = d;
-  listings = (d.listings||[]).filter(l=>l.is_active!==false);
+// ─── LANGUAGE SWITCH ──────────────────────────────────────────────────────────
+function setLang(l){
+  lang=l;
+  applyTranslations();
+  if(DATA){ renderAll(DATA); }
+}
 
-  const ov = d.overview;
-  document.getElementById('header-date').textContent = ov.latest_snapshot_date||'';
-  document.getElementById('header-count').textContent = `${FMT.int((ov.active_listings||{}).current||listings.length)} active listings`;
-  document.getElementById('api-badge').textContent = status==='live'?'LIVE':'MOCK';
-  document.getElementById('api-badge').className = 'api-badge ' + (status==='live'?'live':'mock');
-  const heroEl = document.getElementById('hero-text');
-  if(heroEl) heroEl.textContent = status==='live'
-    ? `Live data · snapshot ${ov.latest_snapshot_date} vs ${ov.previous_snapshot_date||'n/a'}`
-    : 'Running on embedded demo data — start the API (python start_api.py) for live figures.';
-  document.getElementById('footer-date').textContent = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-
+function renderAll(d){
+  const ov=d.overview||{};
+  document.getElementById('header-date').textContent=ov.latest_snapshot_date||'';
+  document.getElementById('header-count').textContent=`${FMT.int((ov.active_listings||{}).current||listings.length)} ${t('kpi.active').toLowerCase()}`;
+  const heroEl=document.getElementById('hero-text');
+  if(heroEl) heroEl.textContent=DATA._status==='live'
+    ?tf(t('hero.live'),ov.latest_snapshot_date,ov.previous_snapshot_date||'n/a')
+    :t('hero.mock');
+  document.getElementById('footer-date').textContent=new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
   renderKPIs(ov);
-  renderCharts(d.timeseries||[], d.districts||[]);
+  renderCharts(d.timeseries||[],d.districts||[]);
   renderPropertyBreakdown(listings);
+  renderInvestorSignals(listings,d.timeseries||[]);
   renderMovements(d.movements||[]);
   populateFilterOptions(listings);
   renderListings();
   renderQuality(d.quality||{});
-
-  ['search-input','filter-district','filter-type','filter-ring','filter-seller',
-   'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
-   'filter-area-min','filter-area-max','filter-newbuild'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener(el.tagName==='SELECT'?'change':'input', ()=>{page=1;renderListings();});
-  });
-
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
 }
 
-function mount(d, status) {
-  try { _mount(d, status); }
-  catch(e) {
-    console.error('[Dashboard] render error:', e);
+// ─── MOUNT ────────────────────────────────────────────────────────────────────
+function mount(d, status){
+  try{
+    DATA=d;
+    DATA._status=status;
+    listings=(d.listings||[]).map(enrichListing).filter(l=>l.is_active!==false);
+    // Show app FIRST so charts can measure canvas dimensions
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('api-badge').textContent=status==='live'?'LIVE':'MOCK';
+    document.getElementById('api-badge').className='api-badge '+(status==='live'?'live':'mock');
+    applyTranslations();
+    renderAll(d);
+    // Wire filter events
+    ['search-input','filter-district','filter-type','filter-ring','filter-seller',
+     'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
+     'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el) el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{page=1;renderListings();});
+    });
+  }catch(e){
+    console.error('[Dashboard] mount error:',e);
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
   }
 }
 
-// ─── BOOT ────────────────────────────────────────────────────────────────────
-function showError(msg) {
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  console.error('[Dashboard]', msg);
-}
-
-async function boot() {
-  try {
-    // Try live API first
-    let data, status;
-    try {
-      const [ovR,tsR,diR,mvR,lsR,qR] = await Promise.all([
-        fetch(`${API}/api/market/overview`),
-        fetch(`${API}/api/market/timeseries`),
-        fetch(`${API}/api/market/districts`),
-        fetch(`${API}/api/market/price-movements`),
-        fetch(`${API}/api/listings?per_page=2000&sort_by=listing_duration_days&sort_order=asc`),
-        fetch(`${API}/api/market/data-quality`),
-      ]);
-      if (!ovR.ok) throw new Error('API unavailable');
-      const [ov,ts,di,mv,ls,q] = await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
-      data = {overview:ov, timeseries:ts.data||[], districts:di.data||[], movements:mv.data||[], listings:ls.data||[], quality:q};
-      status = 'live';
-    } catch(apiErr) {
-      console.warn('[Dashboard] API unavailable, using mock data:', apiErr.message);
-      data = makeMock();
-      status = 'mock';
-    }
-    mount(data, status);
-  } catch(e) {
-    // mount() itself threw — still show the app with whatever rendered
-    console.error('[Dashboard] mount error:', e);
-    showError(e.message);
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+async function boot(){
+  try{
+    const [ovR,tsR,diR,mvR,lsR,qR]=await Promise.all([
+      fetch(`${API}/api/market/overview`),
+      fetch(`${API}/api/market/timeseries`),
+      fetch(`${API}/api/market/districts`),
+      fetch(`${API}/api/market/price-movements`),
+      fetch(`${API}/api/listings?per_page=2000&sort_by=listing_duration_days&sort_order=asc`),
+      fetch(`${API}/api/market/data-quality`),
+    ]);
+    if(!ovR.ok) throw new Error('API unavailable');
+    const [ov,ts,di,mv,ls,q]=await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
+    mount({overview:ov,timeseries:ts.data||[],districts:di.data||[],movements:mv.data||[],listings:ls.data||[],quality:q},'live');
+  }catch(e){
+    console.warn('[Dashboard] API unavailable, using mock data:',e.message);
+    mount(makeMock(),'mock');
   }
 }
-
 boot();
 </script>
 </body>
