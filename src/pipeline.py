@@ -4,10 +4,18 @@ import pandas as pd
 
 from src.adapters.sreality import SrealityAdapter
 from src.adapters.bezrealitky import BezrealitkyAdapter
-from src.db.io import init_db, read_table_df, write_dataframe_replace
+from src.db.database import engine
+from src.db.import_clean_csvs_to_postgres import import_clean_csvs_to_postgres
+from src.db.io import (
+    init_db,
+    read_postgres_current_state_df,
+    read_postgres_history_df,
+    read_table_df,
+    write_dataframe_replace,
+)
 from src.reports.generate_reports import generate_daily_price_csv, generate_market_report_html, generate_removed_listings_csv
 from src.utils.logger import get_logger
-from src.utils.process_csv import process_master_csv
+from src.utils.process_csv import process_master_dataframe
 from src.utils.state import reconcile_current_with_previous, build_history_snapshot
 
 logger = get_logger("pipeline")
@@ -92,14 +100,18 @@ def run_pipeline(include_bezrealitky=False):
     history_csv = "data/listing_history.csv"
     removed_csv = "data/removed_listings.csv"
 
-    logger.info("STAGE: Writing raw master CSV")
+    logger.info("STAGE: Writing raw master CSV mirror")
     raw_df.to_csv(master_csv, index=False)
-    logger.info("STAGE: Processing CSV into structured dataset")
-    process_master_csv(master_csv, processed_csv)
-    processed_df = pd.read_csv(processed_csv)
-    logger.info("STAGE: Loading previous DB state")
-    previous_state = read_table_df("listings")
-    previous_history = read_table_df("listing_history")
+    logger.info("STAGE: Processing scraped rows into structured dataset")
+    processed_df = process_master_dataframe(raw_df)
+    processed_df.to_csv(processed_csv, index=False)
+    logger.info("STAGE: Loading previous market state")
+    if engine.dialect.name == "postgresql":
+        previous_state = read_postgres_current_state_df()
+        previous_history = read_postgres_history_df()
+    else:
+        previous_state = read_table_df("listings")
+        previous_history = read_table_df("listing_history")
     logger.info("STAGE: Reconciling current state with previous state")
     current_state, summary = reconcile_current_with_previous(processed_df, previous_state, now)
     logger.info("STAGE: Enriching with cross-listing district median fields")
@@ -114,10 +126,19 @@ def run_pipeline(include_bezrealitky=False):
     full_history = full_history.drop_duplicates(
         subset=["composite_id", "scraped_at", "exists_on_source"], keep="last"
     ).reset_index(drop=True)
-    write_dataframe_replace(full_history, "listing_history")
     logger.info("STAGE: Writing CSV mirrors")
     current_state.to_csv(processed_csv, index=False)
     full_history.to_csv(history_csv, index=False)
+    removed_state = current_state[current_state.get("is_removed", False) == True].copy() if "is_removed" in current_state.columns else pd.DataFrame()
+    removed_state.to_csv(removed_csv, index=False)
+    if engine.dialect.name == "postgresql":
+        logger.info("STAGE: Refreshing normalized PostgreSQL analytics tables")
+        import_clean_csvs_to_postgres()
+    else:
+        logger.info("STAGE: Persisting current state to development database")
+        write_dataframe_replace(current_state, "listings")
+        logger.info("STAGE: Persisting history to development database")
+        write_dataframe_replace(full_history, "listing_history")
     logger.info("STAGE: Generating reports")
     generate_daily_price_csv(full_history)
     generate_market_report_html(current_state)

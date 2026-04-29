@@ -20,6 +20,19 @@ PROPERTY_TYPE_LABELS = {
     "ostatni":  "ostatni",
 }
 
+SOURCE_SCOPE_LABELS = {
+    "praha": {
+        "region_name": "Praha",
+        "city_name": "Praha",
+        "country_name": "Czech Republic",
+    },
+    "stredocesky_kraj": {
+        "region_name": "Středočeský kraj",
+        "city_name": None,
+        "country_name": "Czech Republic",
+    },
+}
+
 # ─── Neighbourhood → city district mapping ────────────────────────────────────
 
 NEIGHBOURHOOD_TO_ZONE: Dict[str, str] = {
@@ -419,6 +432,7 @@ PRICE_RE       = re.compile(r"([\d\s]+)\s*Kč", re.IGNORECASE)
 PRAHA_ZONE_RE  = re.compile(r"(Praha\s*\d+)", re.IGNORECASE)
 DISTRICT_RE    = re.compile(r"^Praha\s+\d+$", re.IGNORECASE)
 DISTRICT_NUM_RE = re.compile(r"Praha\s*(\d+)", re.IGNORECASE)
+PRICE_CONTINUATION_RE = re.compile(r"^\s+\d{3}(?:\s+\d{3})*(?:\s*Kč)?", re.IGNORECASE)
 
 BAD_DISTRICT_PHRASES = [
     "Cena na vyžádání", "Cena na vyzadani", "na vyžádání", "na vyzadani",
@@ -429,6 +443,7 @@ KNOWN_NON_LISTING_TITLES = {
     "prodeje pozemků", "prodeje pozemku", "pronájmy bytů", "pronajmy bytu",
 }
 KNOWN_BOROUGH_NAMES = set(NEIGHBOURHOOD_TO_ZONE.keys())
+VALID_PRAGUE_ZONE_NUMBERS = set(range(1, 23))
 
 # ─── Derived-field enrichment constants ──────────────────────────────────────
 
@@ -513,10 +528,31 @@ def extract_detail_features(details_json):
 def normalize_prague_zone(text):
     if not text:
         return None
-    m = PRAHA_ZONE_RE.search(str(text))
-    if m:
-        return re.sub(r"\s+", " ", m.group(1)).strip()
+    text = str(text)
+    for match in DISTRICT_NUM_RE.finditer(text):
+        try:
+            zone_number = int(match.group(1))
+        except (TypeError, ValueError):
+            continue
+        if zone_number not in VALID_PRAGUE_ZONE_NUMBERS:
+            continue
+        remainder = text[match.end():]
+        if PRICE_CONTINUATION_RE.match(remainder):
+            continue
+        return f"Praha {zone_number}"
     return None
+
+
+def is_valid_prague_zone(value) -> bool:
+    if not value or pd.isna(value):
+        return False
+    match = DISTRICT_NUM_RE.search(str(value))
+    if not match:
+        return False
+    try:
+        return int(match.group(1)) in VALID_PRAGUE_ZONE_NUMBERS
+    except (TypeError, ValueError):
+        return False
 
 
 def clean_district_text(text):
@@ -568,7 +604,7 @@ def looks_like_listing_title(text: str) -> bool:
 
 def infer_property_type(title, property_search_type):
     if property_search_type:
-        return property_search_type
+        return str(property_search_type).split("_", 1)[0]
     title = (title or "").lower()
     if "byt" in title:
         return "byt"
@@ -583,6 +619,17 @@ def infer_property_type(title, property_search_type):
 
 def convert_property_type_label(code):
     return PROPERTY_TYPE_LABELS.get(code, code)
+
+
+def infer_market_scope(property_search_type: Optional[str]) -> str:
+    token = str(property_search_type or "").lower()
+    if token.endswith("_sc"):
+        return "stredocesky_kraj"
+    return "praha"
+
+
+def infer_scope_defaults(property_search_type: Optional[str]) -> Dict[str, Optional[str]]:
+    return SOURCE_SCOPE_LABELS[infer_market_scope(property_search_type)].copy()
 
 
 def deduce_zone_from_text(text):
@@ -705,6 +752,16 @@ def deduce_district_and_zone(address_text, title_text=None):
             district_name = psc_district
             zone = zone or psc_district
 
+    expected_zone = NEIGHBOURHOOD_TO_ZONE.get(borough_name) if borough_name else None
+    if expected_zone:
+        district_name = expected_zone
+        zone = expected_zone
+
+    if zone and not is_valid_prague_zone(zone):
+        zone = None
+    if district_name and district_name != "Praha - Ostatní" and not is_valid_prague_zone(district_name):
+        district_name = None
+
     # Fallback sentinels
     if not zone:
         zone = "Praha - Ostatní"
@@ -731,6 +788,7 @@ def deduce_district_and_zone(address_text, title_text=None):
 def parse_title(title, property_search_type=None):
     title = clean_text(title)
     property_type_code = infer_property_type(title, property_search_type)
+    scope_defaults = infer_scope_defaults(property_search_type)
     out = {
         "property_type_code":  property_type_code,
         "property_type":       convert_property_type_label(property_type_code),
@@ -744,14 +802,20 @@ def parse_title(title, property_search_type=None):
         "district_name":       None,
         "prague_zone":         None,
         "location_quality":    "missing_district,missing_borough",
-        "city_name":           "Praha",
-        "region_name":         "Praha",
-        "country_name":        "Czech Republic",
+        "city_name":           scope_defaults["city_name"],
+        "region_name":         scope_defaults["region_name"],
+        "country_name":        scope_defaults["country_name"],
     }
     if not title:
-        out["borough_name"]  = "Praha - Ostatní"
-        out["district_name"] = "Praha - Ostatní"
-        out["prague_zone"]   = "Praha - Ostatní"
+        if infer_market_scope(property_search_type) == "praha":
+            out["borough_name"]  = "Praha - Ostatní"
+            out["district_name"] = "Praha - Ostatní"
+            out["prague_zone"]   = "Praha - Ostatní"
+        else:
+            out["borough_name"]  = None
+            out["district_name"] = None
+            out["prague_zone"]   = None
+            out["location_quality"] = "missing_district,missing_borough"
         return out
 
     m = LAYOUT_RE.search(title)
@@ -789,13 +853,26 @@ def parse_title(title, property_search_type=None):
         else:
             out["street_address"] = address_txt
 
-    borough_name, district_name, prague_zone, location_quality = deduce_district_and_zone(
-        address_txt, title
-    )
-    out["borough_name"]     = borough_name
-    out["district_name"]    = district_name
-    out["prague_zone"]      = prague_zone
-    out["location_quality"] = location_quality
+    if infer_market_scope(property_search_type) == "praha":
+        borough_name, district_name, prague_zone, location_quality = deduce_district_and_zone(
+            address_txt, title
+        )
+        out["borough_name"]     = borough_name
+        out["district_name"]    = district_name
+        out["prague_zone"]      = prague_zone
+        out["location_quality"] = location_quality
+    else:
+        locality = None
+        if address_txt:
+            parts = [clean_text(part) for part in re.split(r",|\|", address_txt) if clean_text(part)]
+            locality = parts[-1] if parts else clean_text(address_txt)
+        locality = clean_text(locality)
+        if locality and locality.lower().startswith("praha"):
+            locality = None
+        out["borough_name"] = locality
+        out["district_name"] = locality
+        out["prague_zone"] = None
+        out["location_quality"] = "ok" if locality else "missing_district,missing_borough"
     return out
 
 
@@ -973,6 +1050,16 @@ def process_master_csv(
             df["url_id"].astype(str)
         )
 
+    out = process_master_dataframe(df)
+    out.to_csv(output_path, index=False)
+    logger.info(f"STAGE: CSV processing finished | output rows: {len(out)}")
+    return output_path
+
+
+def process_master_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+
     out = df.copy()
     out["title"] = out["title"].apply(clean_text)
     out = out[out["title"].apply(looks_like_listing_title)].copy()
@@ -1003,7 +1090,6 @@ def process_master_csv(
     )
     out = pd.concat([out, feature_df], axis=1)
 
-    # Enrich with derived analyst fields
     out = enrich_derived_fields(out)
 
     column_order = [
@@ -1021,9 +1107,6 @@ def process_master_csv(
         "amenity_score",
         "description", "details_json",
     ]
-    existing   = [c for c in column_order if c in out.columns]
-    remaining  = [c for c in out.columns if c not in existing]
-    out        = out[existing + remaining]
-    out.to_csv(output_path, index=False)
-    logger.info(f"STAGE: CSV processing finished | output rows: {len(out)}")
-    return output_path
+    existing = [c for c in column_order if c in out.columns]
+    remaining = [c for c in out.columns if c not in existing]
+    return out[existing + remaining]

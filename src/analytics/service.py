@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Dict, Optional
 
 import pandas as pd
+
+from src.db.io import read_postgres_current_state_df, read_postgres_history_df
+from src.utils.process_csv import NEIGHBOURHOOD_TO_ZONE, deduce_district_and_zone, is_valid_prague_zone
 
 
 NUMERIC_COLUMNS = [
@@ -44,6 +48,10 @@ class MarketDataBundle:
     current_df: pd.DataFrame
     history_df: pd.DataFrame
     removed_df: pd.DataFrame
+
+
+INVALID_BOROUGH_VALUES = {"", "Praha", "Praha - Ostatní"}
+PRAGUE_LATITUDE_REFERENCE = 50.08
 
 
 def _read_csv(path: str) -> pd.DataFrame:
@@ -87,12 +95,24 @@ def _prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
             & (prepared["district_name"].astype(str) != "Praha - Ostatní")
         )
         if bad_district_mask.any():
+            # Before overwriting, rescue the neighbourhood name (e.g. "Smíchov")
+            # that the scraper stored in district_name.
+            if "borough_name" not in prepared.columns:
+                prepared["borough_name"] = None
+            rescue_mask = bad_district_mask & prepared["borough_name"].isna()
+            prepared.loc[rescue_mask, "borough_name"] = prepared.loc[rescue_mask, "district_name"]
             prepared.loc[bad_district_mask, "district_name"] = prepared.loc[bad_district_mask, "prague_zone"]
 
     # Ensure borough_name column always exists (may be None/NaN — that is
     # correct and honest; do NOT fall back to copying district_name).
     if "borough_name" not in prepared.columns:
         prepared["borough_name"] = None
+    if "district_name" not in prepared.columns:
+        prepared["district_name"] = None
+    if "prague_zone" not in prepared.columns:
+        prepared["prague_zone"] = None
+    if "region_name" not in prepared.columns:
+        prepared["region_name"] = None
 
     if "location_quality" not in prepared.columns:
         prepared["location_quality"] = "ok"
@@ -111,6 +131,7 @@ def _prepare_frame(frame: pd.DataFrame) -> pd.DataFrame:
         prepared["snapshot_date"] = pd.to_datetime(prepared["scraped_at"], errors="coerce").dt.date
     elif "last_seen_at" in prepared.columns:
         prepared["snapshot_date"] = pd.to_datetime(prepared["last_seen_at"], errors="coerce").dt.date
+    prepared = _repair_borough_placeholders(prepared)
     return prepared
 
 
@@ -119,11 +140,76 @@ def load_market_data(
     history_path: str = "data/listing_history.csv",
     removed_path: str = "data/removed_listings.csv",
 ) -> MarketDataBundle:
+    db_current = _prepare_frame(read_postgres_current_state_df())
+    db_history = _prepare_frame(read_postgres_history_df())
+    if not db_current.empty or not db_history.empty:
+        removed_df = db_current[db_current.get("is_removed", False) == True].copy() if "is_removed" in db_current.columns else pd.DataFrame()
+        return MarketDataBundle(
+            current_df=db_current,
+            history_df=db_history,
+            removed_df=removed_df,
+        )
     return MarketDataBundle(
         current_df=_prepare_frame(_read_csv(current_path)),
         history_df=_prepare_frame(_read_csv(history_path)),
         removed_df=_prepare_frame(_read_csv(removed_path)),
     )
+
+
+def _is_invalid_borough(value) -> bool:
+    if pd.isna(value):
+        return True
+    return str(value).strip() in INVALID_BOROUGH_VALUES
+
+
+def _repair_borough_placeholders(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "borough_name" not in frame.columns:
+        return frame
+
+    prepared = frame.copy()
+    if "region_name" not in prepared.columns:
+        prepared["region_name"] = None
+
+    prague_mask = prepared["region_name"].fillna("Praha").astype(str).str.contains("Praha", case=False, na=False)
+    unresolved_mask = prepared["borough_name"].map(_is_invalid_borough)
+    repair_mask = prague_mask & unresolved_mask
+    if not repair_mask.any():
+        prepared.loc[unresolved_mask, "borough_name"] = pd.NA
+        return prepared
+
+    for idx, row in prepared.loc[repair_mask].iterrows():
+        borough_name, district_name, prague_zone, _ = deduce_district_and_zone(
+            row.get("full_address") or row.get("street_address"),
+            row.get("title"),
+        )
+        if borough_name and borough_name not in INVALID_BOROUGH_VALUES:
+            prepared.at[idx, "borough_name"] = borough_name
+            if _is_invalid_borough(row.get("district_name")) or pd.isna(row.get("district_name")):
+                prepared.at[idx, "district_name"] = district_name
+            if _is_invalid_borough(row.get("prague_zone")) or pd.isna(row.get("prague_zone")):
+                prepared.at[idx, "prague_zone"] = prague_zone
+        else:
+            prepared.at[idx, "borough_name"] = pd.NA
+
+    prague_rows = prepared["region_name"].fillna("Praha").astype(str).str.contains("Praha", case=False, na=False)
+    for idx, row in prepared.loc[prague_rows].iterrows():
+        borough_name = row.get("borough_name")
+        expected_zone = NEIGHBOURHOOD_TO_ZONE.get(borough_name) if pd.notna(borough_name) else None
+        district_name = row.get("district_name")
+        prague_zone = row.get("prague_zone")
+
+        if expected_zone:
+            if district_name != expected_zone:
+                prepared.at[idx, "district_name"] = expected_zone
+            if prague_zone != expected_zone:
+                prepared.at[idx, "prague_zone"] = expected_zone
+            continue
+
+        if pd.notna(district_name) and district_name != "Praha - Ostatní" and not is_valid_prague_zone(district_name):
+            prepared.at[idx, "district_name"] = pd.NA
+        if pd.notna(prague_zone) and prague_zone != "Praha - Ostatní" and not is_valid_prague_zone(prague_zone):
+            prepared.at[idx, "prague_zone"] = pd.NA
+    return prepared
 
 
 def _apply_common_filters(frame: pd.DataFrame, filters: Optional[Dict] = None) -> pd.DataFrame:
@@ -141,6 +227,8 @@ def _apply_common_filters(frame: pd.DataFrame, filters: Optional[Dict] = None) -
         out = out[out["borough_name"].isin(filters["boroughs"])]
     if filters.get("seller_types") and "seller_type" in out.columns:
         out = out[out["seller_type"].isin(filters["seller_types"])]
+    if filters.get("regions") and "region_name" in out.columns:
+        out = out[out["region_name"].isin(filters["regions"])]
     if filters.get("search"):
         query = str(filters["search"]).strip().lower()
         if query:
@@ -160,6 +248,35 @@ def _apply_common_filters(frame: pd.DataFrame, filters: Optional[Dict] = None) -
         if maximum is not None:
             out = out[out["area_m2"].fillna(0) <= maximum]
     return out
+
+
+def _group_by_geo(frame: pd.DataFrame, grain: str = "borough") -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    if grain == "district":
+        group_cols = ["district_name", "region_name"]
+        label_col = "district_name"
+    else:
+        group_cols = ["borough_name", "district_name", "region_name"]
+        label_col = "borough_name"
+    valid = frame.dropna(subset=[label_col]).copy()
+    if label_col == "borough_name":
+        valid = valid[~valid["borough_name"].map(_is_invalid_borough)]
+    if valid.empty:
+        return pd.DataFrame()
+    return (
+        valid.groupby(group_cols, as_index=False, dropna=False)
+        .agg(
+            active_listings=("composite_id", "count"),
+            median_price_czk=("price_czk", "median"),
+            average_price_czk=("price_czk", "mean"),
+            median_price_per_m2_czk=("price_per_m2_czk", "median"),
+            total_market_value_czk=("price_czk", "sum"),
+            average_days_on_market=("listing_duration_days", "mean"),
+            latitude=("latitude", "median"),
+            longitude=("longitude", "median"),
+        )
+    )
 
 
 def _apply_date_range(frame: pd.DataFrame, filters: Optional[Dict] = None) -> pd.DataFrame:
@@ -335,7 +452,7 @@ def get_market_districts(bundle: MarketDataBundle, filters: Optional[Dict] = Non
         return pd.DataFrame()
 
     current_grouped = (
-        current_active.groupby(["district_name", "borough_name"], as_index=False, dropna=False)
+        current_active.groupby(["district_name", "borough_name", "region_name"], as_index=False, dropna=False)
         .agg(
             active_listings=("composite_id", "count"),
             total_market_value_czk=("price_czk", "sum"),
@@ -348,10 +465,171 @@ def get_market_districts(bundle: MarketDataBundle, filters: Optional[Dict] = Non
         current_grouped["active_listings_delta"] = None
         return current_grouped.sort_values(["active_listings", "total_market_value_czk"], ascending=False)
 
-    prev_grouped = previous_snapshot.groupby("district_name", as_index=False).agg(previous_active_listings=("composite_id", "count"))
-    merged = current_grouped.merge(prev_grouped, on="district_name", how="left")
+    prev_grouped = previous_snapshot.groupby(["district_name", "region_name"], as_index=False).agg(previous_active_listings=("composite_id", "count"))
+    merged = current_grouped.merge(prev_grouped, on=["district_name", "region_name"], how="left")
     merged["active_listings_delta"] = merged["active_listings"] - merged["previous_active_listings"]
     return merged.sort_values(["active_listings", "total_market_value_czk"], ascending=False)
+
+
+def get_market_boroughs(bundle: MarketDataBundle, filters: Optional[Dict] = None) -> pd.DataFrame:
+    context = _get_filtered_context(bundle, filters)
+    current_active = context["current_active"]
+    grouped = _group_by_geo(current_active, "borough")
+    if grouped.empty:
+        return grouped
+    return grouped.sort_values(["median_price_czk", "active_listings"], ascending=False)
+
+
+def get_market_map_data(bundle: MarketDataBundle, filters: Optional[Dict] = None, grain: str = "borough") -> pd.DataFrame:
+    context = _get_filtered_context(bundle, filters)
+    current_active = context["current_active"]
+    grouped = _group_by_geo(current_active, grain)
+    if grouped.empty:
+        return grouped
+    grouped = grouped.dropna(subset=["latitude", "longitude"])
+    return grouped.sort_values(["median_price_czk", "active_listings"], ascending=False)
+
+
+def _project_mercator(lat: float, lon: float):
+    # Local equirectangular projection so Prague retains a sensible x/y aspect
+    # for hex aggregation without depending on a GIS library.
+    scale = math.cos(math.radians(PRAGUE_LATITUDE_REFERENCE))
+    return float(lon) * scale, float(lat)
+
+
+def _inverse_mercator(x: float, y: float):
+    scale = math.cos(math.radians(PRAGUE_LATITUDE_REFERENCE))
+    return float(y), float(x) / scale
+
+
+def _hex_round(q: float, r: float):
+    x = q
+    z = r
+    y = -x - z
+    rx = round(x)
+    ry = round(y)
+    rz = round(z)
+    x_diff = abs(rx - x)
+    y_diff = abs(ry - y)
+    z_diff = abs(rz - z)
+    if x_diff > y_diff and x_diff > z_diff:
+        rx = -ry - rz
+    elif y_diff > z_diff:
+        ry = -rx - rz
+    else:
+        rz = -rx - ry
+    return int(rx), int(rz)
+
+
+def _mode_or_none(series: pd.Series):
+    cleaned = series.dropna()
+    if cleaned.empty:
+        return None
+    modes = cleaned.mode()
+    if modes.empty:
+        return None
+    return modes.iloc[0]
+
+
+def get_market_hexagons(bundle: MarketDataBundle, filters: Optional[Dict] = None, grid_size: int = 18):
+    context = _get_filtered_context(bundle, filters)
+    current_active = context["current_active"]
+    required_columns = {"latitude", "longitude"}
+    if current_active.empty or not required_columns.issubset(current_active.columns):
+        return pd.DataFrame(), {"type": "FeatureCollection", "features": []}
+
+    frame = current_active.dropna(subset=["latitude", "longitude"]).copy()
+    if frame.empty:
+        return pd.DataFrame(), {"type": "FeatureCollection", "features": []}
+
+    projected = frame.apply(lambda row: _project_mercator(row["latitude"], row["longitude"]), axis=1, result_type="expand")
+    frame["hex_x"] = projected[0]
+    frame["hex_y"] = projected[1]
+
+    width = max(frame["hex_x"].max() - frame["hex_x"].min(), 1e-6)
+    height = max(frame["hex_y"].max() - frame["hex_y"].min(), 1e-6)
+    size = max(width, height) / max(int(grid_size), 1)
+    size = max(size, 1e-4)
+    sqrt3 = math.sqrt(3)
+
+    def _assign_hex(row):
+        q = ((sqrt3 / 3.0) * row["hex_x"] - (1.0 / 3.0) * row["hex_y"]) / size
+        r = ((2.0 / 3.0) * row["hex_y"]) / size
+        return _hex_round(q, r)
+
+    axial = frame.apply(_assign_hex, axis=1, result_type="expand")
+    frame["hex_q"] = axial[0]
+    frame["hex_r"] = axial[1]
+    frame["hex_id"] = frame["hex_q"].astype(str) + ":" + frame["hex_r"].astype(str)
+
+    grouped = (
+        frame.groupby("hex_id", as_index=False)
+        .agg(
+            active_listings=("composite_id", "count"),
+            median_price_czk=("price_czk", "median"),
+            average_price_czk=("price_czk", "mean"),
+            median_price_per_m2_czk=("price_per_m2_czk", "median"),
+            total_market_value_czk=("price_czk", "sum"),
+            average_days_on_market=("listing_duration_days", "mean"),
+            district_name=("district_name", _mode_or_none),
+            borough_name=("borough_name", _mode_or_none),
+            region_name=("region_name", _mode_or_none),
+            latitude=("latitude", "median"),
+            longitude=("longitude", "median"),
+            hex_q=("hex_q", "first"),
+            hex_r=("hex_r", "first"),
+        )
+        .sort_values(["active_listings", "median_price_czk"], ascending=False)
+        .reset_index(drop=True)
+    )
+
+    features = []
+    for row in grouped.itertuples(index=False):
+        center_x = size * sqrt3 * (row.hex_q + (row.hex_r / 2.0))
+        center_y = size * 1.5 * row.hex_r
+        corners = []
+        for corner_index in range(6):
+            angle = math.radians((60 * corner_index) - 30)
+            corner_x = center_x + (size * math.cos(angle))
+            corner_y = center_y + (size * math.sin(angle))
+            corner_lat, corner_lon = _inverse_mercator(corner_x, corner_y)
+            corners.append([corner_lon, corner_lat])
+        corners.append(corners[0])
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "hex_id": row.hex_id,
+                    "district_name": row.district_name,
+                    "borough_name": row.borough_name,
+                    "region_name": row.region_name,
+                },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [corners],
+                },
+            }
+        )
+
+    return grouped, {"type": "FeatureCollection", "features": features}
+
+
+def get_source_inventory(bundle: MarketDataBundle, filters: Optional[Dict] = None) -> pd.DataFrame:
+    context = _get_filtered_context(bundle, filters)
+    current_active = context["current_active"]
+    if current_active.empty or "source" not in current_active.columns:
+        return pd.DataFrame()
+    grouped = (
+        current_active.groupby("source", as_index=False)
+        .agg(
+            active_listings=("composite_id", "count"),
+            total_market_value_czk=("price_czk", "sum"),
+            median_price_czk=("price_czk", "median"),
+            median_price_per_m2_czk=("price_per_m2_czk", "median"),
+        )
+        .sort_values("active_listings", ascending=False)
+    )
+    return grouped
 
 
 def get_market_price_movements(bundle: MarketDataBundle, filters: Optional[Dict] = None) -> pd.DataFrame:

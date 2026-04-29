@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import os
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -152,6 +153,10 @@ _DASHBOARD_PATHS = [
     Path("dashboard.html"),
     Path(__file__).parents[2] / "dashboard.html",
 ]
+_PRAGUE_GEOJSON_PATHS = [
+    Path("data/reference/prague_city_parts.geojson"),
+    Path(__file__).parents[2] / "data/reference/prague_city_parts.geojson",
+]
 
 
 @app.get("/", include_in_schema=False)
@@ -171,6 +176,14 @@ def reload_data():
     if b is None:
         return {"status": "no_data", "message": "No CSV data found. Run run_pipeline.py first."}
     return {"status": "ok", "message": "Market data reloaded."}
+
+
+@app.get("/api/market/geo/prague-city-parts", summary="Official Prague city-part polygons for the choropleth")
+def prague_city_parts_geojson():
+    for path in _PRAGUE_GEOJSON_PATHS:
+        if path.exists():
+            return JSONResponse(json.loads(path.read_text(encoding="utf-8")))
+    raise HTTPException(404, "Prague boundary GeoJSON not found.")
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +277,60 @@ def market_districts(
     filters = _build_filters(source, property_type, district, borough, seller_type, search, price_min, price_max, size_min, size_max, date_from, date_to)
     df = get_market_districts(bundle, filters)
     return {"data": _clean_records(df)}
+
+
+@app.get("/api/market/map", summary="Map-ready borough or district analytics")
+def market_map_data(
+    grain: str = Query("borough", pattern="^(borough|district)$"),
+    source: Optional[List[str]] = Query(None),
+    property_type: Optional[List[str]] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    borough: Optional[List[str]] = Query(None),
+    seller_type: Optional[List[str]] = Query(None),
+    search: Optional[str] = Query(None),
+    price_min: Optional[float] = Query(None),
+    price_max: Optional[float] = Query(None),
+    size_min: Optional[float] = Query(None),
+    size_max: Optional[float] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+):
+    bundle = _get_bundle()
+    if bundle is None:
+        raise HTTPException(503, "No market data available.")
+
+    from src.analytics.service import get_market_map_data
+
+    filters = _build_filters(source, property_type, district, borough, seller_type, search, price_min, price_max, size_min, size_max, date_from, date_to)
+    df = get_market_map_data(bundle, filters, grain=grain)
+    return {"data": _clean_records(df)}
+
+
+@app.get("/api/market/map/hex", summary="Hex-grid analytics built from listing coordinates")
+def market_hex_map_data(
+    grid_size: int = Query(18, ge=10, le=32),
+    source: Optional[List[str]] = Query(None),
+    property_type: Optional[List[str]] = Query(None),
+    district: Optional[List[str]] = Query(None),
+    borough: Optional[List[str]] = Query(None),
+    seller_type: Optional[List[str]] = Query(None),
+    search: Optional[str] = Query(None),
+    price_min: Optional[float] = Query(None),
+    price_max: Optional[float] = Query(None),
+    size_min: Optional[float] = Query(None),
+    size_max: Optional[float] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+):
+    bundle = _get_bundle()
+    if bundle is None:
+        raise HTTPException(503, "No market data available.")
+
+    from src.analytics.service import get_market_hexagons
+
+    filters = _build_filters(source, property_type, district, borough, seller_type, search, price_min, price_max, size_min, size_max, date_from, date_to)
+    df, geojson = get_market_hexagons(bundle, filters, grid_size=grid_size)
+    return {"data": _clean_records(df), "geojson": geojson, "grid_size": grid_size}
 
 
 # ---------------------------------------------------------------------------

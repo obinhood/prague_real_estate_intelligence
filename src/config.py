@@ -16,11 +16,17 @@ CONFIG = {
             "timeout_seconds": 45,
             "user_agent": "Mozilla/5.0",
             "property_paths": {
-                "byt": "https://www.sreality.cz/hledani/prodej/byty/praha",
-                "dum": "https://www.sreality.cz/hledani/prodej/domy/praha",
-                "pozemek": "https://www.sreality.cz/hledani/prodej/pozemky/praha",
+                # Prague
+                "byt":      "https://www.sreality.cz/hledani/prodej/byty/praha",
+                "dum":      "https://www.sreality.cz/hledani/prodej/domy/praha",
+                "pozemek":  "https://www.sreality.cz/hledani/prodej/pozemky/praha",
                 "komercni": "https://www.sreality.cz/hledani/prodej/komercni/praha",
-                "ostatni": "https://www.sreality.cz/hledani/prodej/ostatni/praha"
+                "ostatni":  "https://www.sreality.cz/hledani/prodej/ostatni/praha",
+                # Středočeský kraj (Central Bohemia — surrounds Prague)
+                "byt_sc":      "https://www.sreality.cz/hledani/prodej/byty/stredocesky-kraj",
+                "dum_sc":      "https://www.sreality.cz/hledani/prodej/domy/stredocesky-kraj",
+                "pozemek_sc":  "https://www.sreality.cz/hledani/prodej/pozemky/stredocesky-kraj",
+                "komercni_sc": "https://www.sreality.cz/hledani/prodej/komercni/stredocesky-kraj",
             }
         },
         "bezrealitky": {
@@ -28,10 +34,15 @@ CONFIG = {
             "timeout_seconds": 45,
             "user_agent": "Mozilla/5.0",
             "property_paths": {
-                "byt": "https://www.bezrealitky.cz/vypis/nabidka-prodej/byt/praha",
-                "dum": "https://www.bezrealitky.cz/vypis/nabidka-prodej/dum/praha",
+                # Prague
+                "byt":     "https://www.bezrealitky.cz/vypis/nabidka-prodej/byt/praha",
+                "dum":     "https://www.bezrealitky.cz/vypis/nabidka-prodej/dum/praha",
                 "pozemek": "https://www.bezrealitky.cz/vypis/nabidka-prodej/pozemek/praha",
-                "ostatni": "https://www.bezrealitky.cz/vypis/nabidka-prodej/garaz/praha"
+                "ostatni": "https://www.bezrealitky.cz/vypis/nabidka-prodej/garaz/praha",
+                # Středočeský kraj
+                "byt_sc":     "https://www.bezrealitky.cz/vypis/nabidka-prodej/byt/stredocesky-kraj",
+                "dum_sc":     "https://www.bezrealitky.cz/vypis/nabidka-prodej/dum/stredocesky-kraj",
+                "pozemek_sc": "https://www.bezrealitky.cz/vypis/nabidka-prodej/pozemek/stredocesky-kraj",
             }
         }
     }

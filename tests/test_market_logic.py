@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from src.analytics.service import _prepare_frame, get_market_overview, MarketDataBundle
-from src.utils.process_csv import deduce_district_and_zone, looks_like_listing_title
+from src.utils.process_csv import deduce_district_and_zone, infer_market_scope, infer_property_type, looks_like_listing_title, parse_title
 from src.utils.state import build_history_snapshot, reconcile_current_with_previous
 
 
@@ -29,6 +29,37 @@ class MarketLogicTests(unittest.TestCase):
         self.assertEqual(district, "Praha 5")
         self.assertEqual(zone, "Praha 5")
         self.assertEqual(quality, "ok")
+
+    def test_stredocesky_scope_normalizes_property_type(self):
+        self.assertEqual(infer_property_type("", "byt_sc"), "byt")
+        self.assertEqual(infer_market_scope("dum_sc"), "stredocesky_kraj")
+        parsed = parse_title("Prodej domu 120 m² Mělník 8 900 000 Kč", "dum_sc")
+        self.assertEqual(parsed["region_name"], "Středočeský kraj")
+        self.assertEqual(parsed["district_name"], "Mělník")
+        self.assertIsNone(parsed["prague_zone"])
+        price_like_zone = parse_title("Prodej bytu atypický 129 m² Křižíkova, Praha 26 560 000 Kč", "byt")
+        self.assertEqual(price_like_zone["borough_name"], "Karlín")
+        self.assertEqual(price_like_zone["district_name"], "Praha 8")
+        self.assertEqual(price_like_zone["prague_zone"], "Praha 8")
+
+    def test_prepare_frame_drops_unresolved_praha_borough_placeholder(self):
+        prepared = _prepare_frame(
+            pd.DataFrame(
+                [
+                    {
+                        "title": "Prodej bytu 2+kk 58 m² Praha 12 172 000 Kč",
+                        "full_address": "Praha",
+                        "borough_name": "Praha",
+                        "district_name": "Praha 1",
+                        "prague_zone": "Praha 1",
+                        "region_name": "Praha",
+                        "is_active": True,
+                        "last_seen_at": "2026-04-28 10:00:00",
+                    }
+                ]
+            )
+        )
+        self.assertTrue(prepared["borough_name"].isna().iloc[0])
 
     def test_reconciliation_counts_stayed_new_and_removed(self):
         previous = pd.DataFrame(

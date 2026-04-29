@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Prague Real Estate Intelligence</title>
+<title>Prague RE Intelligence</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
 :root{
-  --bg:#070b14;--bg-card:#0d1526;--bg-card2:#111e35;
-  --border:rgba(92,120,200,0.18);--border-h:rgba(110,145,240,0.35);
-  --text:#e8efff;--t2:#8fa3cc;--t3:#5a6e96;
-  --blue:#6b8fff;--green:#6ee7b7;--red:#ff7070;--yellow:#f7d47c;--purple:#a78bfa;
+  --bg:#071018;--bg-card:#0d1623;--bg-card2:#142131;
+  --border:rgba(129,145,166,0.18);--border-h:rgba(123,166,184,0.34);
+  --text:#edf3fb;--t2:#a4b3c6;--t3:#6f8399;
+  --blue:#6c8ea2;--green:#78b49d;--red:#d37474;--yellow:#c8af74;--purple:#8d84b4;--teal:#5e93a0;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5}
@@ -31,6 +32,10 @@ input:focus,select:focus{border-color:var(--blue)}
 .header-right{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--t2)}
 .lang-btn{font-size:11px;padding:3px 9px;border-radius:6px;font-weight:700;color:var(--t3);border:1px solid transparent;transition:all .15s}
 .lang-btn.active,.lang-btn:hover{color:var(--blue);border-color:rgba(107,143,255,0.4);background:rgba(107,143,255,0.1)}
+.src-btn{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:700;color:var(--t3);border:1px solid transparent;transition:all .15s}
+.src-btn.active{color:var(--text);border-color:rgba(110,231,183,0.5);background:rgba(110,231,183,0.1)}
+.src-btn:hover:not(.active){color:var(--t2);border-color:var(--border);background:rgba(255,255,255,0.04)}
+.src-divider{width:1px;height:20px;background:var(--border)}
 .main{padding:20px 24px;max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 .grid{display:grid;gap:14px}
 .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
@@ -58,6 +63,7 @@ tr:hover td{background:var(--bg-card2)}
 .badge-blue{background:rgba(107,143,255,0.12);color:var(--blue)}
 .badge-yellow{background:rgba(247,212,124,0.12);color:var(--yellow)}
 .badge-purple{background:rgba(167,139,250,0.12);color:var(--purple)}
+.badge-teal{background:rgba(94,147,160,0.16);color:var(--teal)}
 .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .filter-bar input,.filter-bar select{min-width:140px;max-width:200px}
 .btn{background:rgba(107,143,255,0.15);color:var(--blue);border:1px solid rgba(107,143,255,0.3);border-radius:8px;padding:7px 14px;font-size:13px;font-weight:600;transition:background .15s}
@@ -75,6 +81,19 @@ tr:hover td{background:var(--bg-card2)}
 .hidden{display:none!important}
 .chart-box{position:relative;height:220px}
 .qrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.map-box{height:470px;border-radius:14px;overflow:hidden;background:radial-gradient(circle at top,rgba(108,142,162,0.18),rgba(13,22,35,0.94) 60%)}
+.map-note{font-size:12px;color:var(--t3);margin-top:10px}
+.map-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.segmented{display:flex;gap:6px;flex-wrap:wrap}
+.seg-btn{padding:6px 12px;border:1px solid var(--border);border-radius:999px;color:var(--t2);font-size:12px;font-weight:700;background:rgba(255,255,255,0.02);transition:all .15s}
+.seg-btn:hover{border-color:var(--border-h);color:var(--text)}
+.seg-btn.active{border-color:rgba(120,180,157,0.55);background:rgba(120,180,157,0.12);color:var(--text)}
+.map-toolbar label{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.map-toolbar select{min-width:120px}
+.map-scale{margin-top:14px}
+.map-scale-label{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px}
+.map-scale-bar{height:12px;border-radius:999px;background:linear-gradient(90deg,#173247 0%,#2e607b 45%,#6f9ead 100%);border:1px solid rgba(164,179,198,0.18)}
+.map-scale-ticks{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--t2);margin-top:8px}
 </style>
 </head>
 <body>
@@ -89,6 +108,8 @@ tr:hover td{background:var(--bg-card2)}
     <div class="header-left">
       <div class="logo">🏙 Prague RE Intelligence</div>
       <span id="api-badge" class="api-badge mock">MOCK</span>
+      <div class="src-divider"></div>
+      <div id="source-btns" style="display:flex;gap:4px"></div>
     </div>
     <div class="header-right">
       <span id="header-date"></span>
@@ -117,10 +138,14 @@ tr:hover td{background:var(--bg-card2)}
       <div class="card"><div class="card-title" data-i18n="chart.price">Median Price Over Time</div><div class="chart-box"><canvas id="chart-price"></canvas></div></div>
     </div>
 
-    <div class="sec-hdr" data-i18n="sec.districts">District Analysis</div>
+    <div class="sec-hdr" data-i18n="sec.districts">District &amp; Neighbourhood Analysis</div>
     <div class="grid g2">
-      <div class="card"><div class="card-title" data-i18n="chart.district_count">Active Listings by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-count"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.district_count">Active Listings by District (Praha N)</div><div class="chart-box" style="height:260px"><canvas id="chart-district-count"></canvas></div></div>
       <div class="card"><div class="card-title" data-i18n="chart.district_price">Median Price/m² by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-price"></canvas></div></div>
+    </div>
+    <div class="grid g2">
+      <div class="card"><div class="card-title" data-i18n="chart.borough_count">Top Neighbourhoods by Listings</div><div class="chart-box" style="height:300px"><canvas id="chart-borough-count"></canvas></div></div>
+      <div class="card"><div class="card-title" data-i18n="chart.borough_price">Top Neighbourhoods by Median Price/m²</div><div class="chart-box" style="height:300px"><canvas id="chart-borough-price"></canvas></div></div>
     </div>
 
     <div class="sec-hdr" data-i18n="sec.type">Property Type Breakdown</div>
@@ -142,8 +167,9 @@ tr:hover td{background:var(--bg-card2)}
       <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" id="movement-filters"></div>
       <div class="tbl-wrap"><table id="movements-table">
         <thead><tr>
-          <th data-i18n="col.type">Type</th><th data-i18n="col.title">Title</th>
-          <th data-i18n="col.district">District</th><th data-i18n="col.asking_price">Asking Price</th>
+          <th data-i18n="col.source">Source</th><th data-i18n="col.type">Type</th><th data-i18n="col.title">Title</th>
+          <th data-i18n="col.district">District</th><th data-i18n="col.borough">Borough</th>
+          <th data-i18n="col.asking_price">Asking Price</th>
           <th data-i18n="col.change">Change</th><th data-i18n="col.on_market">On Market</th>
         </tr></thead>
         <tbody id="movements-body"></tbody>
@@ -155,6 +181,7 @@ tr:hover td{background:var(--bg-card2)}
       <div class="filter-bar" style="margin-bottom:10px">
         <input type="text" id="search-input" data-i18n-placeholder="filter.search"/>
         <select id="filter-district"><option value="" data-i18n="filter.all_districts">All Districts</option></select>
+        <select id="filter-borough"><option value="" data-i18n="filter.all_boroughs">All Boroughs</option></select>
         <select id="filter-type"><option value="" data-i18n="filter.all_types">All Types</option></select>
         <select id="filter-ring">
           <option value="" data-i18n="filter.all_zones">All Zones</option>
@@ -163,6 +190,7 @@ tr:hover td{background:var(--bg-card2)}
           <option value="middle" data-i18n="ring.middle">Middle Ring</option>
           <option value="outer" data-i18n="ring.outer">Outer Ring</option>
         </select>
+        <select id="filter-region"><option value="" data-i18n="filter.all_regions">All Regions</option></select>
         <select id="filter-seller"><option value="" data-i18n="filter.all_sellers">All Sellers</option></select>
         <button class="btn btn-sm" onclick="resetFilters()" data-i18n="filter.reset">Reset</button>
       </div>
@@ -206,7 +234,7 @@ tr:hover td{background:var(--bg-card2)}
     <div class="card" id="quality-panel"></div>
 
     <div style="color:var(--t3);font-size:11px;text-align:center;padding:8px 0 24px">
-      Prague Real Estate Intelligence · Sreality · <span id="footer-date"></span>
+      Prague Real Estate Intelligence · Sreality · Bezrealitky · <span id="footer-date"></span>
     </div>
   </div>
 </div>
@@ -217,20 +245,28 @@ const TR = {
   en: {
     'hero.eyebrow':'Prague Market Intelligence',
     'hero.title':'Daily listing intelligence for analysts, investors & operators',
-    'sec.trends':'Market Trends','sec.districts':'District Analysis',
+    'sec.trends':'Market Trends','sec.location':'Location Intelligence','sec.districts':'District & Neighbourhood Analysis',
     'sec.type':'Property Type Breakdown','sec.investor':'Investor Signals',
     'sec.movements':'Market Movements','sec.listings':'Active Listings','sec.quality':'Data Quality',
     'chart.inventory':'Active Listings Over Time','chart.price':'Median Price Over Time',
-    'chart.district_count':'Active Listings by District','chart.district_price':'Median Price/m² by District',
+    'chart.choropleth':'Median price choropleth by Prague borough / district',
+    'chart.choropleth_note':'Filled polygons prefer borough matches and fall back to district metrics where only district-level coverage is available.',
+    'chart.hex':'Median price hex grid from listing coordinates',
+    'chart.hex_note':'Hex cells aggregate listing-level coordinates directly, giving a street-scale price surface while the district charts below remain available.',
+    'map.mode_boundary':'Boundary View','map.mode_hex':'Hex Grid','map.grid_size':'Hex Density',
+    'chart.district_count':'Active Listings by District (Praha N)','chart.district_price':'Median Price/m² by District',
+    'chart.borough_count':'Top Neighbourhoods by Listings','chart.borough_price':'Top Neighbourhoods by Median Price/m²',
     'chart.type_count':'Listings by Type','chart.type_price':'Median Price by Type','chart.type_summary':'Type Summary',
     'chart.dom_buckets':'Days on Market Distribution','chart.tier_mix':'Price Tier Mix','chart.flow':'Supply Flow (New vs. Removed)',
     'kpi.active':'Active Listings','kpi.value':'Total Market Value','kpi.price':'Median Asking Price','kpi.ppm2':'Median Price/m²',
     'kpi.new':'New Listings','kpi.removed':'Removed','kpi.reductions':'Price Reductions','kpi.days':'Avg. Days on Market',
-    'col.type':'Type','col.title':'Title','col.district':'District','col.zone':'Zone','col.layout':'Layout',
+    'col.source':'Source','col.type':'Type','col.title':'Title','col.district':'District','col.borough':'Borough',
+    'col.zone':'Zone','col.region':'Region','col.layout':'Layout',
     'col.area':'Area (m²)','col.asking_price':'Asking Price','col.ppm2':'Price/m²','col.tier':'Price Tier',
     'col.on_market':'On Market','col.link':'Link','col.change':'Change',
-    'filter.search':'Search listings…','filter.all_districts':'All Districts','filter.all_types':'All Types',
-    'filter.all_zones':'All Zones','filter.all_sellers':'All Sellers','filter.any_beds':'Any Bedrooms',
+    'filter.search':'Search listings…','filter.all_districts':'All Districts','filter.all_boroughs':'All Boroughs',
+    'filter.all_types':'All Types','filter.all_zones':'All Zones','filter.all_regions':'All Regions',
+    'filter.all_sellers':'All Sellers','filter.any_beds':'Any Bedrooms',
     'filter.studio':'Studio','filter.beds2':'2 Rooms','filter.beds3':'3 Rooms','filter.beds4':'4+ Rooms',
     'filter.all_tiers':'All Price Tiers','filter.price_min':'Min Price (CZK)','filter.price_max':'Max Price (CZK)',
     'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Any Build',
@@ -241,7 +277,7 @@ const TR = {
     'ring.inner':'Inner Prague','ring.central':'Central','ring.middle':'Middle Ring','ring.outer':'Outer Ring',
     'type.byty':'Apartments','type.domy':'Houses','type.komercni prostory':'Commercial',
     'type.pozemky':'Land','type.ostatni':'Other','type.unknown':'Unknown',
-    'seller.agent':'Agent','seller.private':'Private','seller.developer':'Developer',
+    'seller.agent':'Agent','seller.agency':'Agency','seller.private':'Private','seller.developer':'Developer','seller.owner':'Owner',
     'mov.all':'All','mov.new':'New','mov.removed':'Removed','mov.price_reduction':'Price ↓','mov.price_increase':'Price ↑',
     'quality.coverage':'Coverage','quality.active':'active','quality.total':'total',
     'quality.missing_price':'Missing price','quality.missing_area':'Missing area',
@@ -249,24 +285,34 @@ const TR = {
     'stats.count_median':'count · median price',
     'hero.live':'Live data · snapshot {0} vs {1}','hero.mock':'Running on embedded demo data — start the API for live figures.',
     'snapshot.only_one':'Only one snapshot — run pipeline again for deltas',
+    'src.all':'All Sources','src.sreality':'Sreality','src.bezrealitky':'Bezrealitky',
+    'region.Praha':'Praha','region.Středočeský kraj':'Central Bohemia',
   },
   cs: {
     'hero.eyebrow':'Pražský realitní trh',
     'hero.title':'Denní přehled inzerátů pro analytiky, investory a operátory',
-    'sec.trends':'Tržní trendy','sec.districts':'Analýza obvodů',
+    'sec.trends':'Tržní trendy','sec.location':'Lokační inteligence','sec.districts':'Analýza obvodů a čtvrtí',
     'sec.type':'Přehled typů nemovitostí','sec.investor':'Investorské signály',
     'sec.movements':'Pohyb trhu','sec.listings':'Aktivní nabídky','sec.quality':'Kvalita dat',
     'chart.inventory':'Aktivní inzeráty v čase','chart.price':'Mediánová cena v čase',
+    'chart.choropleth':'Choropleth mapa mediánové ceny podle čtvrti / obvodu',
+    'chart.choropleth_note':'Vyplněné polygony přednostně používají shodu na úrovni čtvrti a při chybějící čtvrti padají zpět na obvodová data.',
+    'chart.hex':'Hexagonová mapa mediánové ceny z přesných souřadnic nabídek',
+    'chart.hex_note':'Hexagony agregují souřadnice jednotlivých nabídek přímo, takže dostanete detailnější cenový povrch, zatímco obvodové grafy dole zůstávají k dispozici.',
+    'map.mode_boundary':'Hranice obvodů','map.mode_hex':'Hexagonová síť','map.grid_size':'Hustota hexů',
     'chart.district_count':'Aktivní inzeráty podle obvodu','chart.district_price':'Mediánová cena/m² podle obvodu',
+    'chart.borough_count':'Nejaktivnější čtvrti','chart.borough_price':'Nejdražší čtvrti (Kč/m²)',
     'chart.type_count':'Inzeráty podle typu','chart.type_price':'Mediánová cena podle typu','chart.type_summary':'Přehled typů',
     'chart.dom_buckets':'Délka inzerce','chart.tier_mix':'Složení trhu (cenové kategorie)','chart.flow':'Průtok nabídky (nové vs. stažené)',
     'kpi.active':'Aktivní inzeráty','kpi.value':'Celková tržní hodnota','kpi.price':'Mediánová cena','kpi.ppm2':'Mediánová cena/m²',
     'kpi.new':'Nové inzeráty','kpi.removed':'Staženo','kpi.reductions':'Snížení cen','kpi.days':'Průměrná délka inzerce',
-    'col.type':'Typ','col.title':'Název','col.district':'Obvod','col.zone':'Zóna','col.layout':'Dispozice',
+    'col.source':'Zdroj','col.type':'Typ','col.title':'Název','col.district':'Obvod','col.borough':'Čtvrť',
+    'col.zone':'Zóna','col.region':'Region','col.layout':'Dispozice',
     'col.area':'Plocha (m²)','col.asking_price':'Cena','col.ppm2':'Kč/m²','col.tier':'Kategorie',
     'col.on_market':'Na trhu','col.link':'Odkaz','col.change':'Změna',
-    'filter.search':'Hledat nabídky…','filter.all_districts':'Všechny obvody','filter.all_types':'Všechny typy',
-    'filter.all_zones':'Všechny zóny','filter.all_sellers':'Všichni prodejci','filter.any_beds':'Libovolný počet pokojů',
+    'filter.search':'Hledat nabídky…','filter.all_districts':'Všechny obvody','filter.all_boroughs':'Všechny čtvrti',
+    'filter.all_types':'Všechny typy','filter.all_zones':'Všechny zóny','filter.all_regions':'Všechny regiony',
+    'filter.all_sellers':'Všichni prodejci','filter.any_beds':'Libovolný počet pokojů',
     'filter.studio':'Garsoniéra','filter.beds2':'2 pokoje','filter.beds3':'3 pokoje','filter.beds4':'4+ pokojů',
     'filter.all_tiers':'Všechny kategorie','filter.price_min':'Min cena (Kč)','filter.price_max':'Max cena (Kč)',
     'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Libovolné',
@@ -277,7 +323,7 @@ const TR = {
     'ring.inner':'Centrum','ring.central':'Vnitřní město','ring.middle':'Střední okruh','ring.outer':'Vnější okruh',
     'type.byty':'Byty','type.domy':'Domy','type.komercni prostory':'Komerční',
     'type.pozemky':'Pozemky','type.ostatni':'Ostatní','type.unknown':'Neznámé',
-    'seller.agent':'Makléř','seller.private':'Soukromý','seller.developer':'Developer',
+    'seller.agent':'Makléř','seller.agency':'Agentura','seller.private':'Soukromý','seller.developer':'Developer','seller.owner':'Vlastník',
     'mov.all':'Vše','mov.new':'Nové','mov.removed':'Stažené','mov.price_reduction':'Snížení ceny','mov.price_increase':'Zvýšení ceny',
     'quality.coverage':'Pokrytí','quality.active':'aktivní','quality.total':'celkem',
     'quality.missing_price':'Chybí cena','quality.missing_area':'Chybí plocha',
@@ -285,24 +331,34 @@ const TR = {
     'stats.count_median':'počet · mediánová cena',
     'hero.live':'Živá data · snímek {0} vs {1}','hero.mock':'Zobrazuji ukázková data — spusťte API pro živá data.',
     'snapshot.only_one':'Pouze jeden snímek — spusťte pipeline znovu pro delta hodnoty',
+    'src.all':'Všechny zdroje','src.sreality':'Sreality','src.bezrealitky':'Bezrealitky',
+    'region.Praha':'Praha','region.Středočeský kraj':'Středočeský kraj',
   },
   vi: {
     'hero.eyebrow':'Thông tin thị trường bất động sản Praha',
     'hero.title':'Dữ liệu rao bán hàng ngày cho nhà phân tích, nhà đầu tư và vận hành',
-    'sec.trends':'Xu hướng thị trường','sec.districts':'Phân tích theo quận',
+    'sec.trends':'Xu hướng thị trường','sec.location':'Bản đồ vị trí','sec.districts':'Phân tích theo quận & khu phố',
     'sec.type':'Phân loại bất động sản','sec.investor':'Tín hiệu đầu tư',
     'sec.movements':'Biến động thị trường','sec.listings':'Bất động sản hiện tại','sec.quality':'Chất lượng dữ liệu',
     'chart.inventory':'Số lượng rao bán theo thời gian','chart.price':'Giá trung vị theo thời gian',
+    'chart.choropleth':'Bản đồ choropleth giá trung vị theo khu phố / quận',
+    'chart.choropleth_note':'Các polygon ưu tiên ghép theo khu phố, và tự động rơi về số liệu cấp quận khi chưa có dữ liệu khu phố tương ứng.',
+    'chart.hex':'Lưới lục giác giá trung vị từ toạ độ từng tin đăng',
+    'chart.hex_note':'Các ô lục giác tổng hợp trực tiếp từ toạ độ tin đăng, cho góc nhìn giá ở cấp đường phố trong khi các biểu đồ quận bên dưới vẫn giữ nguyên.',
+    'map.mode_boundary':'Ranh giới hành chính','map.mode_hex':'Lưới lục giác','map.grid_size':'Mật độ lưới',
     'chart.district_count':'Số lượng rao bán theo quận','chart.district_price':'Giá trung vị/m² theo quận',
+    'chart.borough_count':'Khu phố nhiều rao bán nhất','chart.borough_price':'Khu phố đắt nhất (Kč/m²)',
     'chart.type_count':'Phân loại bất động sản','chart.type_price':'Giá trung vị theo loại','chart.type_summary':'Tóm tắt loại hình',
     'chart.dom_buckets':'Phân phối thời gian rao','chart.tier_mix':'Cơ cấu phân khúc giá','chart.flow':'Luồng cung (Mới vs. Đã rút)',
     'kpi.active':'Đang rao bán','kpi.value':'Tổng giá trị thị trường','kpi.price':'Giá trung vị','kpi.ppm2':'Giá trung vị/m²',
     'kpi.new':'Mới rao','kpi.removed':'Đã rút','kpi.reductions':'Giảm giá','kpi.days':'Số ngày rao TB',
-    'col.type':'Loại','col.title':'Tiêu đề','col.district':'Quận','col.zone':'Khu vực','col.layout':'Mặt bằng',
+    'col.source':'Nguồn','col.type':'Loại','col.title':'Tiêu đề','col.district':'Quận','col.borough':'Khu phố',
+    'col.zone':'Khu vực','col.region':'Vùng','col.layout':'Mặt bằng',
     'col.area':'Diện tích (m²)','col.asking_price':'Giá rao','col.ppm2':'Giá/m²','col.tier':'Phân khúc',
     'col.on_market':'Thời gian rao','col.link':'Xem','col.change':'Thay đổi',
-    'filter.search':'Tìm kiếm bất động sản…','filter.all_districts':'Tất cả quận','filter.all_types':'Tất cả loại',
-    'filter.all_zones':'Tất cả khu vực','filter.all_sellers':'Tất cả bên bán','filter.any_beds':'Tất cả số phòng',
+    'filter.search':'Tìm kiếm bất động sản…','filter.all_districts':'Tất cả quận','filter.all_boroughs':'Tất cả khu phố',
+    'filter.all_types':'Tất cả loại','filter.all_zones':'Tất cả khu vực','filter.all_regions':'Tất cả vùng',
+    'filter.all_sellers':'Tất cả bên bán','filter.any_beds':'Tất cả số phòng',
     'filter.studio':'Studio','filter.beds2':'2 phòng','filter.beds3':'3 phòng','filter.beds4':'4+ phòng',
     'filter.all_tiers':'Tất cả phân khúc','filter.price_min':'Giá tối thiểu (CZK)','filter.price_max':'Giá tối đa (CZK)',
     'filter.area_min':'Min m²','filter.area_max':'Max m²','filter.any_build':'Tất cả',
@@ -313,7 +369,7 @@ const TR = {
     'ring.inner':'Trung tâm','ring.central':'Nội thành','ring.middle':'Vành đai giữa','ring.outer':'Ngoại thành',
     'type.byty':'Căn hộ','type.domy':'Nhà ở','type.komercni prostory':'Thương mại',
     'type.pozemky':'Đất','type.ostatni':'Khác','type.unknown':'Không rõ',
-    'seller.agent':'Môi giới','seller.private':'Cá nhân','seller.developer':'Chủ đầu tư',
+    'seller.agent':'Môi giới','seller.agency':'Công ty','seller.private':'Cá nhân','seller.developer':'Chủ đầu tư','seller.owner':'Chủ nhà',
     'mov.all':'Tất cả','mov.new':'Mới','mov.removed':'Đã rút','mov.price_reduction':'Giảm giá','mov.price_increase':'Tăng giá',
     'quality.coverage':'Độ phủ','quality.active':'đang hoạt động','quality.total':'tổng cộng',
     'quality.missing_price':'Thiếu giá','quality.missing_area':'Thiếu diện tích',
@@ -321,6 +377,8 @@ const TR = {
     'stats.count_median':'số lượng · giá trung vị',
     'hero.live':'Dữ liệu trực tiếp · ảnh chụp {0} so với {1}','hero.mock':'Đang dùng dữ liệu mẫu — khởi động API để xem dữ liệu thực.',
     'snapshot.only_one':'Chỉ có một ảnh chụp — chạy lại pipeline để có delta',
+    'src.all':'Tất cả nguồn','src.sreality':'Sreality','src.bezrealitky':'Bezrealitky',
+    'region.Praha':'Praha','region.Středočeský kraj':'Trung Bohemia',
   }
 };
 
@@ -334,16 +392,9 @@ function tv(field, val) {
 function tf(str, ...args) { return str.replace(/{(\d+)}/g,(_,i)=>args[i]??_); }
 
 function applyTranslations() {
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = t(el.dataset.i18n);
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    el.placeholder = t(el.dataset.i18nPlaceholder);
-  });
-  // Update select option text that has data-i18n
-  document.querySelectorAll('option[data-i18n]').forEach(el => {
-    el.textContent = t(el.dataset.i18n);
-  });
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); });
+  document.querySelectorAll('option[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
   const lb = document.getElementById('lang-'+lang);
   if (lb) lb.classList.add('active');
@@ -352,32 +403,32 @@ function applyTranslations() {
 
 // ─── COMPUTED FIELD HELPERS ────────────────────────────────────────────────────
 function computeTier(price) {
-  const p = +price;
-  if (!p) return null;
-  if (p < 5e6)  return 'budget';
-  if (p < 10e6) return 'mid';
-  if (p < 20e6) return 'premium';
-  return 'luxury';
+  const p = +price; if (!p) return null;
+  if (p < 5e6) return 'budget'; if (p < 10e6) return 'mid';
+  if (p < 20e6) return 'premium'; return 'luxury';
 }
 function ringFromDistrict(dist) {
   if (!dist) return null;
-  const m = dist.match(/Praha\s+(\d+)/i);
-  if (!m) return null;
+  const m = dist.match(/Praha\s+(\d+)/i); if (!m) return null;
   const n = +m[1];
-  if (n <= 2) return 'inner';
-  if (n <= 6) return 'central';
-  if (n <= 10) return 'middle';
-  return 'outer';
+  if (n <= 2) return 'inner'; if (n <= 6) return 'central'; if (n <= 10) return 'middle'; return 'outer';
 }
 function bedsFromLayout(layout) {
   if (!layout) return null;
   if (/garson|studio/i.test(layout)) return 0;
-  const m = layout.match(/^(\d+)/);
-  return m ? +m[1] : null;
+  const m = layout.match(/^(\d+)/); return m ? +m[1] : null;
+}
+// Extract borough from title: "Prodej bytu 2+kk ... Praha - Smíchov" → "Smíchov"
+function boroughFromTitle(title) {
+  if (!title) return null;
+  const m = title.match(/Praha\s*[-–]\s*([A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ][^,\d]+?)(?:\s+\d|\s*$)/u);
+  return m ? m[1].trim() : null;
 }
 function enrichListing(l) {
+  const borough = l.borough_name || boroughFromTitle(l.title) || null;
   return {
     ...l,
+    borough_name: borough,
     _tier: l.price_tier || computeTier(l.price_czk),
     _ring: l.prague_ring || ringFromDistrict(l.district_name),
     _beds: l.bedroom_count ?? bedsFromLayout(l.layout_type),
@@ -397,27 +448,37 @@ const FMT = {
 
 // ─── MOCK DATA ─────────────────────────────────────────────────────────────────
 function makeMock() {
-  const districts=[
-    {n:'Praha 1',ppm2:175000},{n:'Praha 2',ppm2:148000},{n:'Praha 3',ppm2:118000},
-    {n:'Praha 4',ppm2:107000},{n:'Praha 5',ppm2:119000},{n:'Praha 6',ppm2:132000},
-    {n:'Praha 7',ppm2:124000},{n:'Praha 8',ppm2:116000},{n:'Praha 9',ppm2:95000},{n:'Praha 10',ppm2:105000},
+  const distData=[
+    {n:'Praha 1',ppm2:175000,boroughs:['Staré Město','Josefov','Nové Město']},
+    {n:'Praha 2',ppm2:148000,boroughs:['Vinohrady','Nusle']},
+    {n:'Praha 3',ppm2:118000,boroughs:['Žižkov','Vinohrady']},
+    {n:'Praha 4',ppm2:107000,boroughs:['Nusle','Podolí','Krč','Braník']},
+    {n:'Praha 5',ppm2:119000,boroughs:['Smíchov','Košíře','Motol']},
+    {n:'Praha 6',ppm2:132000,boroughs:['Dejvice','Bubeneč','Hradčany','Střešovice']},
+    {n:'Praha 7',ppm2:124000,boroughs:['Holešovice','Letná','Troja']},
+    {n:'Praha 8',ppm2:116000,boroughs:['Karlín','Kobylisy','Libeň']},
+    {n:'Praha 9',ppm2:95000,boroughs:['Vysočany','Prosek','Letňany']},
+    {n:'Praha 10',ppm2:105000,boroughs:['Vršovice','Strašnice','Záběhlice']},
   ];
   const layouts=['1+kk','2+kk','2+1','3+kk','3+1','4+kk'];
   const types=['byty','byty','byty','byty','domy','pozemky','komercni prostory'];
   const sellers=['agent','private','developer'];
+  const sources=['sreality','sreality','sreality','sreality','bezrealitky'];
   const rings={1:'inner',2:'inner',3:'central',4:'central',5:'central',6:'central',7:'middle',8:'middle',9:'middle',10:'outer'};
   let id=1;
   function listing(){
-    const d=districts[Math.floor(Math.random()*districts.length)];
+    const d=distData[Math.floor(Math.random()*distData.length)];
+    const borough=d.boroughs[Math.floor(Math.random()*d.boroughs.length)];
     const layout=layouts[Math.floor(Math.random()*layouts.length)];
     const area=35+Math.floor(Math.random()*130);
     const price=Math.round(d.ppm2*area*(0.85+Math.random()*0.3)/10000)*10000;
     const tier=computeTier(price);
     const dn=parseInt((d.n.match(/\d+/)||[0])[0]);
+    const src=sources[Math.floor(Math.random()*sources.length)];
     return {
-      composite_id:'mock_'+(id++),source:'sreality',
-      property_type:types[Math.floor(Math.random()*types.length)],
-      district_name:d.n,title:`Prodej bytu ${layout}, ${area} m², ${d.n}`,
+      composite_id:`${src}_mock_${id++}`,source:src,property_type:types[Math.floor(Math.random()*types.length)],
+      district_name:d.n,borough_name:borough,region_name:'Praha',
+      title:`Prodej bytu ${layout}, ${area} m², ${d.n} - ${borough}`,
       layout_type:layout,area_m2:area,price_czk:price,price_per_m2_czk:Math.round(price/area),
       price_tier:tier,prague_ring:rings[dn]||'outer',bedroom_count:bedsFromLayout(layout),
       seller_type:sellers[Math.floor(Math.random()*sellers.length)],
@@ -431,7 +492,7 @@ function makeMock() {
     {snapshot_date:'2026-04-29',active_listings:230,median_price_czk:10990000,median_price_per_m2_czk:115800,new_listings:14,removed_listings:6,price_increases:4,price_reductions:6},
   ];
   const curr=ts[2],prev=ts[1];
-  const distData=districts.map(d=>{
+  const districts=distData.map(d=>{
     const ds=listings.filter(l=>l.district_name===d.n);
     const prices=ds.map(l=>l.price_per_m2_czk).sort((a,b)=>a-b);
     return{district_name:d.n,active_listings:ds.length,median_price_per_m2_czk:prices[Math.floor(prices.length/2)]||0};
@@ -446,7 +507,8 @@ function makeMock() {
       new_listings:curr.new_listings,removed_listings:curr.removed_listings,
       price_reductions:curr.price_reductions,price_increases:curr.price_increases,days_on_market_avg:47,
     },
-    timeseries:ts,districts:distData,listings,
+    timeseries:ts,districts,listings,
+    availableSources:['sreality','bezrealitky'],
     movements:[
       ...listings.slice(224).map(l=>({...l,movement:'new'})),
       ...listings.slice(210,218).map(l=>({...l,movement:'removed'})),
@@ -461,6 +523,9 @@ let DATA=null, listings=[], filteredListings=[];
 let sortCol='listing_duration_days', sortAsc=true, page=1;
 const PER_PAGE=50;
 let movFilter='all', charts={};
+let activeSource=''; // '' = all sources
+let mapMode='boundary';
+let hexGridSize=18;
 
 // ─── CHART HELPERS ─────────────────────────────────────────────────────────────
 const CD={
@@ -472,8 +537,7 @@ const CD={
 function makeChart(id,type,data,extra={}){
   if(typeof Chart==='undefined') return;
   if(charts[id]) charts[id].destroy();
-  const ctx=document.getElementById(id);
-  if(!ctx) return;
+  const ctx=document.getElementById(id); if(!ctx) return;
   const cartesian=!['doughnut','pie','polarArea','radar'].includes(type);
   const base=cartesian?CD:{animation:CD.animation};
   try{
@@ -481,6 +545,462 @@ function makeChart(id,type,data,extra={}){
     if(!cartesian) delete opts.scales;
     charts[id]=new Chart(ctx,{type,data,options:opts});
   }catch(e){console.warn('[Chart]',id,e.message);}
+}
+
+function median(values){
+  if(!values||!values.length) return null;
+  const sorted=[...values].filter(v=>Number.isFinite(v)).sort((a,b)=>a-b);
+  if(!sorted.length) return null;
+  return sorted[Math.floor(sorted.length/2)];
+}
+function percentile(values, p){
+  if(!values||!values.length) return null;
+  const sorted=[...values].filter(v=>Number.isFinite(v)).sort((a,b)=>a-b);
+  if(!sorted.length) return null;
+  if(sorted.length === 1) return sorted[0];
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * p)));
+  return sorted[index];
+}
+function computeGeoBounds(geojson){
+  if(!geojson?.features?.length) return null;
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  geojson.features.forEach(feature => {
+    const rings = feature?.geometry?.coordinates || [];
+    rings.forEach(ring => {
+      ring.forEach(point => {
+        const [lon, lat] = point || [];
+        if(!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+        minLon = Math.min(minLon, lon);
+        maxLon = Math.max(maxLon, lon);
+        minLat = Math.min(minLat, lat);
+        maxLat = Math.max(maxLat, lat);
+      });
+    });
+  });
+  if(!Number.isFinite(minLon) || !Number.isFinite(maxLon) || !Number.isFinite(minLat) || !Number.isFinite(maxLat)){
+    return null;
+  }
+  return { minLon, maxLon, minLat, maxLat };
+}
+function formatShortPpm2(value){
+  if(!Number.isFinite(value)) return 'n/a';
+  return `${Math.round(value/1000)}k Kč/m²`;
+}
+function renderMapScale(mode, zMin, zMax){
+  const target = document.getElementById('location-map-scale');
+  if(!target) return;
+  const mid = Number.isFinite(zMin) && Number.isFinite(zMax) ? zMin + ((zMax - zMin) / 2) : null;
+  target.innerHTML = `
+    <div class="map-scale-label">${mode === 'hex' ? 'Street-scale price surface' : 'Administrative boundary price surface'}</div>
+    <div class="map-scale-bar"></div>
+    <div class="map-scale-ticks">
+      <span>${formatShortPpm2(zMin)}</span>
+      <span>${formatShortPpm2(mid)}</span>
+      <span>${formatShortPpm2(zMax)}</span>
+    </div>
+  `;
+}
+function normalizePlaceName(value){
+  if(!value) return '';
+  return String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase()
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function stripPrahaPrefix(value){
+  const raw = String(value || '').trim();
+  if(raw.startsWith('Praha-')) return raw.slice(6).trim();
+  if(raw.startsWith('Praha - ')) return raw.slice(8).trim();
+  return raw;
+}
+function buildFeatureCatalog(geojson){
+  const byAlias = {};
+  const allCodes = [];
+  const features = (geojson && geojson.features) || [];
+  features.forEach(feature => {
+    const props = feature.properties || {};
+    const code = props.KOD_MC;
+    const primary = props.NAZEV_1 || null;
+    const secondary = props.NAZEV_MC || null;
+    const aliases = [primary, secondary, stripPrahaPrefix(primary), stripPrahaPrefix(secondary)]
+      .filter(Boolean)
+      .map(normalizePlaceName);
+    allCodes.push(code);
+    aliases.forEach(alias => {
+      if(!alias) return;
+      byAlias[alias] = {
+        code,
+        primaryName: primary || secondary,
+        secondaryName: secondary || primary,
+      };
+    });
+  });
+  return { byAlias, allCodes };
+}
+function collapseMapRows(rows, keyColumn){
+  const lookup = {};
+  (rows || []).forEach(row => {
+    const keyValue = row?.[keyColumn];
+    if(!keyValue) return;
+    const key = normalizePlaceName(keyValue);
+    if(!lookup[key]){
+      lookup[key] = {
+        ...row,
+        active_listings_sum: 0,
+        market_values: [],
+        medians_price: [],
+        medians_ppm2: [],
+        avg_days: [],
+      };
+    }
+    lookup[key].active_listings_sum += Number(row.active_listings || 0);
+    if(Number.isFinite(+row.total_market_value_czk) && +row.total_market_value_czk > 0){
+      lookup[key].market_values.push(+row.total_market_value_czk);
+    }
+    if(Number.isFinite(+row.median_price_czk) && +row.median_price_czk > 0){
+      lookup[key].medians_price.push(+row.median_price_czk);
+    }
+    if(Number.isFinite(+row.median_price_per_m2_czk) && +row.median_price_per_m2_czk > 0){
+      lookup[key].medians_ppm2.push(+row.median_price_per_m2_czk);
+    }
+    if(Number.isFinite(+row.average_days_on_market) && +row.average_days_on_market > 0){
+      lookup[key].avg_days.push(+row.average_days_on_market);
+    }
+  });
+  Object.values(lookup).forEach(row => {
+    row.active_listings = row.active_listings_sum;
+    row.total_market_value_czk = row.market_values.length ? row.market_values.reduce((sum, value) => sum + value, 0) : Number(row.total_market_value_czk || 0);
+    row.median_price_czk = median(row.medians_price);
+    row.median_price_per_m2_czk = median(row.medians_ppm2);
+    row.average_days_on_market = median(row.avg_days);
+  });
+  return lookup;
+}
+function buildChoroplethRows(geojson, boroughRows, districtRows){
+  if(!geojson?.features?.length) return [];
+  const catalog = buildFeatureCatalog(geojson);
+  const boroughLookup = collapseMapRows(boroughRows, 'borough_name');
+  const districtLookup = collapseMapRows(districtRows, 'district_name');
+  const districtOther = districtLookup[normalizePlaceName('Praha - Ostatní')] || null;
+  const rows = [];
+  geojson.features.forEach(feature => {
+    const props = feature?.properties || {};
+    const featureCode = props.KOD_MC;
+    const primaryName = props.NAZEV_1 || null;
+    const secondaryName = props.NAZEV_MC || null;
+    const featureName = primaryName || secondaryName;
+    if(!featureName) return;
+    const aliases = [featureName, primaryName, secondaryName].filter(Boolean);
+    let match = null;
+    let matchLevel = 'borough';
+    for(const alias of aliases){
+      const key = normalizePlaceName(alias);
+      if(boroughLookup[key]){
+        match = boroughLookup[key];
+        break;
+      }
+    }
+    if(!match){
+      matchLevel = 'district';
+      for(const alias of aliases){
+        const key = normalizePlaceName(alias);
+        if(districtLookup[key]){
+          match = districtLookup[key];
+          break;
+        }
+      }
+    }
+    if(!match && districtOther){
+      match = districtOther;
+      matchLevel = 'outer_district_fallback';
+    }
+    if(!match) return;
+    rows.push({
+      feature_code: featureCode,
+      feature_name: primaryName,
+      feature_label: secondaryName || primaryName,
+      match_level: matchLevel,
+      borough_name: match.borough_name || null,
+      district_name: match.district_name || null,
+      region_name: match.region_name || null,
+      active_listings: Number(match.active_listings || 0),
+      median_price_czk: Number(match.median_price_czk || 0),
+      median_price_per_m2_czk: Number(match.median_price_per_m2_czk || 0),
+      total_market_value_czk: Number(match.total_market_value_czk || 0),
+      average_days_on_market: match.average_days_on_market == null ? null : Number(match.average_days_on_market),
+    });
+  });
+  return {
+    rows: rows.filter(row => row.median_price_per_m2_czk > 0 || row.median_price_czk > 0),
+    allCodes: catalog.allCodes,
+  };
+}
+function renderChoroplethMap(geojson, boroughRows, districtRows){
+  const target = document.getElementById('choropleth-map');
+  if(!target) return;
+  if(typeof Plotly === 'undefined'){
+    target.innerHTML = '<div class="map-note">Plotly failed to load, so the choropleth map is unavailable.</div>';
+    return;
+  }
+  const { rows, allCodes } = buildChoroplethRows(geojson, boroughRows, districtRows);
+  if(!rows.length){
+    target.innerHTML = `<div class="map-note">${t('chart.choropleth_note')}</div>`;
+    return;
+  }
+  const metricValues = rows
+    .map(row => row.median_price_per_m2_czk || row.median_price_czk)
+    .filter(value => Number.isFinite(value) && value > 0);
+  const zMin = percentile(metricValues, 0.08) ?? Math.min(...metricValues);
+  const zMaxBase = percentile(metricValues, 0.92) ?? Math.max(...metricValues);
+  const zMax = zMaxBase <= zMin ? Math.max(...metricValues) : zMaxBase;
+  renderMapScale('boundary', zMin, zMax);
+  const outlineTrace = {
+    type: 'choroplethmapbox',
+    geojson,
+    featureidkey: 'properties.KOD_MC',
+    locations: allCodes,
+    z: allCodes.map(() => 0),
+    showscale: false,
+    hoverinfo: 'skip',
+    colorscale: [[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']],
+    marker: {
+      line: {
+        color: 'rgba(164,179,198,0.40)',
+        width: 1.0,
+      },
+    },
+    opacity: 0.2,
+  };
+  const trace = {
+    type: 'choroplethmapbox',
+    geojson,
+    featureidkey: 'properties.KOD_MC',
+    locations: rows.map(row => row.feature_code),
+    z: rows.map(row => row.median_price_per_m2_czk || row.median_price_czk),
+    zmin: zMin,
+    zmax: zMax,
+    text: rows.map(row => row.feature_label),
+    customdata: rows.map(row => [
+      row.borough_name || '—',
+      row.district_name || '—',
+      row.match_level,
+      row.active_listings,
+      row.median_price_czk,
+      row.average_days_on_market == null ? '—' : row.average_days_on_market,
+    ]),
+    colorscale: [
+      [0.0, '#173247'],
+      [0.2, '#27556d'],
+      [0.45, '#3f7891'],
+      [0.75, '#78a9ba'],
+      [1.0, '#bdd6de'],
+    ],
+    marker: {
+      line: {
+        color: 'rgba(216,229,235,0.74)',
+        width: 1.35,
+      },
+    },
+    hovertemplate:
+      '<b>%{text}</b><br>' +
+      'Borough: %{customdata[0]}<br>' +
+      'District: %{customdata[1]}<br>' +
+      'Match level: %{customdata[2]}<br>' +
+      'Median price/m²: %{z:,.0f} Kč<br>' +
+      'Median price: %{customdata[4]:,.0f} Kč<br>' +
+      'Active listings: %{customdata[3]:,.0f}<br>' +
+      'Avg. days on market: %{customdata[5]}<extra></extra>',
+    showscale: false,
+    opacity: 0.88,
+  };
+  const layout = {
+    margin: {l: 0, r: 0, t: 0, b: 0},
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: {color: '#edf3fb'},
+    mapbox: {
+      style: 'carto-darkmatter',
+      center: {lon: 14.4378, lat: 50.0755},
+      zoom: 9.55,
+    },
+  };
+  Plotly.react(target, [outlineTrace, trace], layout, {displayModeBar: false, responsive: true});
+}
+
+function renderHexMap(payload){
+  const target = document.getElementById('choropleth-map');
+  if(!target) return;
+  if(typeof Plotly === 'undefined'){
+    target.innerHTML = '<div class="map-note">Plotly failed to load, so the hex map is unavailable.</div>';
+    return;
+  }
+  const rows = (payload && payload.data ? payload.data : []).filter(row => (row.median_price_per_m2_czk || row.median_price_czk));
+  const geojson = payload && payload.geojson ? payload.geojson : null;
+  if(!rows.length || !geojson?.features?.length){
+    target.innerHTML = `<div class="map-note">${t('chart.hex_note')}</div>`;
+    return;
+  }
+  const metricValues = rows
+    .map(row => row.median_price_per_m2_czk || row.median_price_czk)
+    .filter(value => Number.isFinite(value) && value > 0);
+  const zMin = percentile(metricValues, 0.08) ?? Math.min(...metricValues);
+  const zMaxBase = percentile(metricValues, 0.92) ?? Math.max(...metricValues);
+  const zMax = zMaxBase <= zMin ? Math.max(...metricValues) : zMaxBase;
+  renderMapScale('hex', zMin, zMax);
+  const trace = {
+    type: 'choroplethmapbox',
+    geojson,
+    featureidkey: 'properties.hex_id',
+    locations: rows.map(row => row.hex_id),
+    z: rows.map(row => row.median_price_per_m2_czk || row.median_price_czk),
+    zmin: zMin,
+    zmax: zMax,
+    text: rows.map(row => row.borough_name || row.district_name || row.hex_id),
+    customdata: rows.map(row => [
+      row.borough_name || '—',
+      row.district_name || '—',
+      row.active_listings || 0,
+      row.median_price_czk || null,
+      row.average_days_on_market == null ? '—' : row.average_days_on_market,
+    ]),
+    colorscale: [
+      [0.0, '#173247'],
+      [0.2, '#27556d'],
+      [0.45, '#3f7891'],
+      [0.75, '#78a9ba'],
+      [1.0, '#bdd6de'],
+    ],
+    marker: {
+      line: {
+        color: 'rgba(216,229,235,0.56)',
+        width: 0.76,
+      },
+    },
+    hovertemplate:
+      '<b>%{text}</b><br>' +
+      'Borough: %{customdata[0]}<br>' +
+      'District: %{customdata[1]}<br>' +
+      'Median price/m²: %{z:,.0f} Kč<br>' +
+      'Median price: %{customdata[3]:,.0f} Kč<br>' +
+      'Active listings: %{customdata[2]:,.0f}<br>' +
+      'Avg. days on market: %{customdata[4]}<extra></extra>',
+    showscale: false,
+    opacity: 0.82,
+  };
+  const layout = {
+    margin: {l: 0, r: 0, t: 0, b: 0},
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: {color: '#edf3fb'},
+    mapbox: {
+      style: 'carto-darkmatter',
+      center: {lon: 14.4378, lat: 50.0755},
+      zoom: 9.55,
+    },
+  };
+  Plotly.react(target, [trace], layout, {displayModeBar: false, responsive: true});
+}
+
+function updateLocationControls(){
+  document.querySelectorAll('#map-mode-buttons .seg-btn').forEach(btn => {
+    const isActive = btn.getAttribute('onclick') === `setMapMode('${mapMode}')`;
+    btn.classList.toggle('active', isActive);
+  });
+  const titleEl = document.getElementById('location-map-title');
+  const noteEl = document.getElementById('location-map-note');
+  const gridSelect = document.getElementById('hex-grid-size');
+  if(gridSelect) gridSelect.value = String(hexGridSize);
+  if(titleEl) titleEl.textContent = mapMode === 'hex' ? t('chart.hex') : t('chart.choropleth');
+  if(noteEl) noteEl.textContent = mapMode === 'hex' ? t('chart.hex_note') : t('chart.choropleth_note');
+}
+
+function setMapMode(mode){
+  mapMode = mode === 'hex' ? 'hex' : 'boundary';
+  updateLocationControls();
+  if(DATA) renderLocationMap(DATA);
+}
+
+function setHexGridSize(value){
+  const next = Number(value);
+  if(!Number.isFinite(next) || next === hexGridSize) return;
+  hexGridSize = next;
+  updateLocationControls();
+  refetchHexMap();
+}
+
+function renderLocationMap(d){
+  updateLocationControls();
+  if(mapMode === 'hex'){
+    renderHexMap(d.mapHex || null);
+    return;
+  }
+  renderChoroplethMap(d.pragueGeojson, d.mapBoroughs || [], d.mapDistricts || []);
+}
+
+function refetchHexMap(){
+  if(!DATA) return;
+  const q = activeSource ? `&source=${encodeURIComponent(activeSource)}` : '';
+  fetch(`${API}/api/market/map/hex?grid_size=${encodeURIComponent(hexGridSize)}${q}`)
+    .then(r => r.json())
+    .then(payload => {
+      DATA.mapHex = payload;
+      if(mapMode === 'hex') renderLocationMap(DATA);
+    })
+    .catch(err => console.error('Hex map refresh failed:', err));
+}
+
+// ─── SOURCE SWITCHER ──────────────────────────────────────────────────────────
+function buildSourceButtons(sources){
+  const container=document.getElementById('source-btns');
+  if(!container||!sources||!sources.length) return;
+  const allSrcs=['', ...sources];
+  container.innerHTML=allSrcs.map(s=>{
+    const label=s?t('src.'+s):t('src.all');
+    const active=s===activeSource;
+    return`<button class="src-btn${active?' active':''}" onclick="setSource('${s}')">${label}</button>`;
+  }).join('');
+}
+function setSource(src){
+  if(src===activeSource) return;
+  activeSource=src;
+  document.getElementById('loading-text').textContent='Loading…';
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  // Re-fetch everything for the selected source
+  const q=src?`&source=${encodeURIComponent(src)}`:'';
+  Promise.all([
+    fetch(`${API}/api/market/overview${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
+    fetch(`${API}/api/market/timeseries${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
+    fetch(`${API}/api/market/districts${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
+    fetch(`${API}/api/market/map?grain=borough${q}`).then(r=>r.json()),
+    fetch(`${API}/api/market/map?grain=district${q}`).then(r=>r.json()),
+    fetch(`${API}/api/market/map/hex?grid_size=${encodeURIComponent(hexGridSize)}${q}`).then(r=>r.json()),
+    fetch(`${API}/api/market/price-movements${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
+    fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc${q}`).then(r=>r.json()),
+    fetch(`${API}/api/market/data-quality${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
+  ]).then(([ov,ts,di,mapB,mapD,mapHex,mv,ls,q])=>{
+    const d={
+      overview:ov,timeseries:ts.data||[],districts:di.data||[],
+      mapBoroughs:mapB.data||[],mapDistricts:mapD.data||[],
+      mapHex:mapHex,
+      movements:mv.data||[],listings:ls.data||[],quality:q,
+      availableSources:DATA.availableSources,
+      pragueGeojson:DATA.pragueGeojson || null,
+    };
+    DATA=d; DATA._status='live';
+    listings=(d.listings||[]).map(enrichListing).filter(l=>l.is_active!==false);
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    applyTranslations();
+    buildSourceButtons(DATA.availableSources);
+    renderAll(d);
+  }).catch(e=>{
+    console.error('Source switch failed:',e);
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+  });
 }
 
 // ─── RENDER: KPIs ──────────────────────────────────────────────────────────────
@@ -512,13 +1032,50 @@ function renderKPIs(ov){
 
 // ─── RENDER: MARKET TRENDS ────────────────────────────────────────────────────
 function renderCharts(timeseries,districts){
-  const labels=timeseries.map(t=>t.snapshot_date);
+  const labels=timeseries.map(r=>r.snapshot_date);
   makeChart('chart-inventory','line',{labels,datasets:[{label:t('kpi.active'),data:timeseries.map(r=>r.active_listings),borderColor:'#6b8fff',backgroundColor:'rgba(107,143,255,0.08)',fill:true,tension:.4,pointRadius:4}]});
-  makeChart('chart-price','line',{labels,datasets:[{label:t('kpi.price'),data:timeseries.map(r=>r.median_price_czk),borderColor:'#f7d47c',backgroundColor:'rgba(247,212,124,0.08)',fill:true,tension:.4,pointRadius:4}]},{scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}}});
+  makeChart('chart-price','line',{labels,datasets:[{label:t('kpi.price'),data:timeseries.map(r=>r.median_price_czk),borderColor:'#f7d47c',backgroundColor:'rgba(247,212,124,0.08)',fill:true,tension:.4,pointRadius:4}]},
+    {scales:{...CD.scales,y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,callback:v=>(v/1e6).toFixed(1)+'M'}}}});
+
+  // District-level charts (Praha N)
   const topD=[...districts].sort((a,b)=>b.active_listings-a.active_listings).slice(0,12);
-  makeChart('chart-district-count','bar',{labels:topD.map(d=>d.district_name),datasets:[{data:topD.map(d=>d.active_listings),backgroundColor:'rgba(107,143,255,0.7)',borderRadius:4}]},{indexAxis:'y',scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
+  makeChart('chart-district-count','bar',{labels:topD.map(d=>d.district_name),datasets:[{data:topD.map(d=>d.active_listings),backgroundColor:'rgba(107,143,255,0.7)',borderRadius:4}]},
+    {indexAxis:'y',scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
   const topP=[...districts].filter(d=>d.median_price_per_m2_czk).sort((a,b)=>b.median_price_per_m2_czk-a.median_price_per_m2_czk).slice(0,12);
-  makeChart('chart-district-price','bar',{labels:topP.map(d=>d.district_name),datasets:[{data:topP.map(d=>d.median_price_per_m2_czk),backgroundColor:'rgba(110,231,183,0.7)',borderRadius:4}]},{indexAxis:'y',scales:{x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
+  makeChart('chart-district-price','bar',{labels:topP.map(d=>d.district_name),datasets:[{data:topP.map(d=>d.median_price_per_m2_czk),backgroundColor:'rgba(110,231,183,0.7)',borderRadius:4}]},
+    {indexAxis:'y',scales:{x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:11}}}}});
+}
+
+// ─── RENDER: BOROUGH CHARTS ───────────────────────────────────────────────────
+function renderBoroughCharts(all){
+  const grouped={};
+  all.forEach(l=>{
+    const b=l.borough_name; if(!b) return;
+    if(!grouped[b]) grouped[b]={count:0,prices:[]};
+    grouped[b].count++;
+    if(l.price_per_m2_czk>0) grouped[b].prices.push(+l.price_per_m2_czk);
+  });
+  const entries=Object.entries(grouped).filter(([,v])=>v.count>2);
+  if(!entries.length) return;
+
+  // Top by count
+  const byCount=[...entries].sort((a,b)=>b[1].count-a[1].count).slice(0,18);
+  makeChart('chart-borough-count','bar',{
+    labels:byCount.map(([k])=>k),
+    datasets:[{data:byCount.map(([,v])=>v.count),backgroundColor:'rgba(167,139,250,0.75)',borderRadius:4}]
+  },{indexAxis:'y',scales:{x:{...CD.scales.x},y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:10}}}}});
+
+  // Top by median price/m²
+  const withPrice=entries.filter(([,v])=>v.prices.length>0)
+    .map(([k,v])=>{const s=[...v.prices].sort((a,b)=>a-b); return{k,med:s[Math.floor(s.length/2)]};})
+    .sort((a,b)=>b.med-a.med).slice(0,18);
+  makeChart('chart-borough-price','bar',{
+    labels:withPrice.map(e=>e.k),
+    datasets:[{data:withPrice.map(e=>e.med),backgroundColor:'rgba(94,202,220,0.75)',borderRadius:4}]
+  },{indexAxis:'y',scales:{
+    x:{...CD.scales.x,ticks:{...CD.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},
+    y:{...CD.scales.y,ticks:{...CD.scales.y.ticks,font:{size:10}}}
+  }});
 }
 
 // ─── RENDER: PROPERTY TYPE BREAKDOWN ─────────────────────────────────────────
@@ -551,7 +1108,6 @@ function renderPropertyBreakdown(all){
 
 // ─── RENDER: INVESTOR SIGNALS ──────────────────────────────────────────────────
 function renderInvestorSignals(all,timeseries){
-  // 1. Days on Market buckets
   const dom={fresh:0,active:0,stale:0,stuck:0};
   all.forEach(l=>{ const d=+l.listing_duration_days||0; if(d<=7)dom.fresh++;else if(d<=30)dom.active++;else if(d<=90)dom.stale++;else dom.stuck++; });
   makeChart('chart-dom','bar',{
@@ -560,7 +1116,6 @@ function renderInvestorSignals(all,timeseries){
       backgroundColor:['rgba(110,231,183,0.8)','rgba(107,143,255,0.8)','rgba(247,212,124,0.8)','rgba(255,112,112,0.8)'],borderRadius:5}]
   },{scales:{x:{...CD.scales.x},y:{...CD.scales.y}},plugins:{...CD.plugins}});
 
-  // 2. Price tier mix (computed on-the-fly if price_tier missing)
   const tierCounts={budget:0,mid:0,premium:0,luxury:0};
   all.forEach(l=>{ const tier=l._tier||computeTier(l.price_czk); if(tier) tierCounts[tier]++; });
   const tierLabels=['budget','mid','premium','luxury'];
@@ -570,7 +1125,6 @@ function renderInvestorSignals(all,timeseries){
       backgroundColor:['rgba(110,231,183,0.85)','rgba(107,143,255,0.85)','rgba(247,212,124,0.85)','rgba(167,139,250,0.85)'],borderWidth:1,borderColor:'rgba(0,0,0,0.2)'}]
   },{plugins:{legend:{display:true,position:'right',labels:{color:'#8fa3cc',font:{size:11},boxWidth:12,padding:8}}}});
 
-  // 3. Supply flow: new vs removed over snapshots
   if(timeseries&&timeseries.length){
     const labels=timeseries.map(r=>r.snapshot_date);
     makeChart('chart-flow','bar',{labels,datasets:[
@@ -584,6 +1138,11 @@ function renderInvestorSignals(all,timeseries){
 }
 
 // ─── RENDER: MOVEMENTS ────────────────────────────────────────────────────────
+const SRC_COLORS={sreality:'badge-blue',bezrealitky:'badge-green'};
+function srcBadge(src){
+  const cls=SRC_COLORS[src]||'badge-blue';
+  return`<span class="badge ${cls}" style="font-size:10px">${src||'-'}</span>`;
+}
 function movBadge(tp){
   const m={new:'badge-green',removed:'badge-red',price_reduction:'badge-yellow',price_increase:'badge-blue'};
   return`<span class="badge ${m[tp]||'badge-blue'}">${t('mov.'+tp)||tp}</span>`;
@@ -595,9 +1154,11 @@ function renderMovements(movements){
   ).join('');
   const filt=movFilter==='all'?movements:movements.filter(m=>m.movement===movFilter);
   document.getElementById('movements-body').innerHTML=filt.slice(0,40).map(m=>`<tr>
+    <td>${srcBadge(m.source)}</td>
     <td>${movBadge(m.movement)}</td>
-    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis" title="${m.title||''}">${m.title||'-'}</td>
+    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${m.title||''}">${m.title||'-'}</td>
     <td>${m.district_name||'-'}</td>
+    <td style="font-size:12px;color:var(--t3)">${m.borough_name||'-'}</td>
     <td>${FMT.czk(m.price_czk)}</td>
     <td style="color:${m.price_change_pct<0?'var(--red)':m.price_change_pct>0?'var(--green)':'var(--t2)'}">${m.price_change_pct!=null?(m.price_change_pct>0?'+':'')+Number(m.price_change_pct).toFixed(1)+'%':'-'}</td>
     <td>${FMT.day(m.listing_duration_days)}</td>
@@ -608,7 +1169,8 @@ function setMovFilter(f){ movFilter=f; renderMovements(DATA.movements); }
 // ─── RENDER: LISTINGS TABLE ───────────────────────────────────────────────────
 function renderListingsHead(){
   const cols=[
-    {k:'title',i:'col.title'},{k:'district_name',i:'col.district'},{k:'_ring',i:'col.zone'},
+    {k:'source',i:'col.source'},{k:'title',i:'col.title'},{k:'district_name',i:'col.district'},
+    {k:'borough_name',i:'col.borough'},{k:'region_name',i:'col.region'},{k:'_ring',i:'col.zone'},
     {k:'layout_type',i:'col.layout'},{k:'area_m2',i:'col.area'},{k:'price_czk',i:'col.asking_price'},
     {k:'price_per_m2_czk',i:'col.ppm2'},{k:'_tier',i:'col.tier'},{k:'listing_duration_days',i:'col.on_market'},
     {k:'__link',i:'col.link'},
@@ -627,8 +1189,10 @@ function tierBadge(tier){
 function renderListings(){
   const search=document.getElementById('search-input').value.toLowerCase();
   const dist=document.getElementById('filter-district').value;
+  const borough=document.getElementById('filter-borough').value;
   const type=document.getElementById('filter-type').value;
   const ring=document.getElementById('filter-ring').value;
+  const region=document.getElementById('filter-region').value;
   const seller=document.getElementById('filter-seller').value;
   const beds=document.getElementById('filter-bedrooms').value;
   const tier=document.getElementById('filter-tier').value;
@@ -639,28 +1203,29 @@ function renderListings(){
   const nb=document.getElementById('filter-newbuild').value;
 
   filteredListings=listings.filter(l=>{
-    if(search&&!(l.title||'').toLowerCase().includes(search)&&!(l.district_name||'').toLowerCase().includes(search)) return false;
+    if(search&&!(l.title||'').toLowerCase().includes(search)&&!(l.district_name||'').toLowerCase().includes(search)&&!(l.borough_name||'').toLowerCase().includes(search)) return false;
     if(dist&&l.district_name!==dist) return false;
+    if(borough&&l.borough_name!==borough) return false;
     if(type&&l.property_type!==type) return false;
     if(ring&&l._ring!==ring) return false;
+    if(region&&l.region_name!==region) return false;
     if(seller&&l.seller_type!==seller) return false;
     if(tier&&l._tier!==tier) return false;
     if(beds==='studio'&&l._beds!==0&&l._beds!==1) return false;
     if(beds==='2'&&l._beds!==2) return false;
     if(beds==='3'&&l._beds!==3) return false;
     if(beds==='4'&&(l._beds==null||l._beds<4)) return false;
-    const p=+l.price_czk;
-    if(p&&(p<pMin||p>pMax)) return false;
-    const a=+l.area_m2;
-    if(a&&(a<aMin||a>aMax)) return false;
+    const p=+l.price_czk; if(p&&(p<pMin||p>pMax)) return false;
+    const a=+l.area_m2; if(a&&(a<aMin||a>aMax)) return false;
     if(nb==='1'&&!l.is_new_build) return false;
     if(nb==='0'&&l.is_new_build) return false;
     return true;
   });
   filteredListings.sort((a,b)=>{
     let av=a[sortCol],bv=b[sortCol];
-    if(sortCol==='_ring') { av=a._ring; bv=b._ring; }
-    if(sortCol==='_tier') { av=a._tier; bv=b._tier; }
+    if(sortCol==='_ring'){av=a._ring;bv=b._ring;}
+    if(sortCol==='_tier'){av=a._tier;bv=b._tier;}
+    if(sortCol==='borough_name'){av=a.borough_name;bv=b.borough_name;}
     if(av==null) return 1; if(bv==null) return -1;
     return sortAsc?(av>bv?1:-1):(av<bv?1:-1);
   });
@@ -674,8 +1239,11 @@ function renderListings(){
   document.getElementById('listings-body').innerHTML=slice.map(l=>{
     const pHtml=l.price_change_pct!=null?`<span style="font-size:11px;color:${l.price_change_pct<0?'var(--red)':'var(--green)'};margin-left:4px">(${l.price_change_pct>0?'+':''}${Number(l.price_change_pct).toFixed(1)}%)</span>`:'';
     return`<tr>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
+      <td>${srcBadge(l.source)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
       <td>${l.district_name||'-'}</td>
+      <td style="font-size:12px;color:var(--text)">${l.borough_name||'-'}</td>
+      <td style="font-size:11px;color:var(--t3)">${l.region_name||'-'}</td>
       <td style="font-size:11px;color:var(--t3)">${l._ring?tv('ring',l._ring):'-'}</td>
       <td>${l.layout_type||'-'}</td>
       <td>${l.area_m2!=null?l.area_m2+' m²':'-'}</td>
@@ -690,8 +1258,8 @@ function renderListings(){
 function sortListings(col){ if(sortCol===col)sortAsc=!sortAsc;else{sortCol=col;sortAsc=true;} page=1; renderListings(); }
 function changePage(d){ page+=d; renderListings(); }
 function resetFilters(){
-  ['search-input','filter-district','filter-type','filter-ring','filter-seller',
-   'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
+  ['search-input','filter-district','filter-borough','filter-type','filter-ring','filter-region',
+   'filter-seller','filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
    'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -701,16 +1269,23 @@ function resetFilters(){
 // ─── RENDER: FILTER DROPDOWNS ─────────────────────────────────────────────────
 function populateFilterOptions(all){
   const districts=[...new Set(all.map(l=>l.district_name).filter(Boolean))].sort();
+  const boroughs=[...new Set(all.map(l=>l.borough_name).filter(Boolean))].sort();
   const types=[...new Set(all.map(l=>l.property_type).filter(Boolean))].sort();
   const sellers=[...new Set(all.map(l=>l.seller_type).filter(Boolean))].sort();
+  const regions=[...new Set(all.map(l=>l.region_name).filter(Boolean))].sort();
+
   const ds=document.getElementById('filter-district');
+  const bs=document.getElementById('filter-borough');
   const ts=document.getElementById('filter-type');
   const ss=document.getElementById('filter-seller');
-  // clear existing non-default options
-  [ds,ts,ss].forEach(el=>{ while(el.options.length>1) el.remove(1); });
+  const rs=document.getElementById('filter-region');
+
+  [ds,bs,ts,ss,rs].forEach(el=>{ while(el.options.length>1) el.remove(1); });
   districts.forEach(d=>{const o=document.createElement('option');o.value=o.textContent=d;ds.appendChild(o);});
+  boroughs.forEach(b=>{const o=document.createElement('option');o.value=o.textContent=b;bs.appendChild(o);});
   types.forEach(tp=>{const o=document.createElement('option');o.value=tp;o.textContent=tv('type',tp);ts.appendChild(o);});
   sellers.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=tv('seller',s);ss.appendChild(o);});
+  regions.forEach(r=>{const o=document.createElement('option');o.value=r;o.textContent=t('region.'+r)||r;rs.appendChild(o);});
 }
 
 // ─── RENDER: DATA QUALITY ──────────────────────────────────────────────────────
@@ -736,7 +1311,7 @@ function renderQuality(q){
 function setLang(l){
   lang=l;
   applyTranslations();
-  if(DATA){ renderAll(DATA); }
+  if(DATA){ buildSourceButtons(DATA.availableSources); renderAll(DATA); }
 }
 
 function renderAll(d){
@@ -750,6 +1325,7 @@ function renderAll(d){
   document.getElementById('footer-date').textContent=new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
   renderKPIs(ov);
   renderCharts(d.timeseries||[],d.districts||[]);
+  renderBoroughCharts(listings);
   renderPropertyBreakdown(listings);
   renderInvestorSignals(listings,d.timeseries||[]);
   renderMovements(d.movements||[]);
@@ -761,19 +1337,17 @@ function renderAll(d){
 // ─── MOUNT ────────────────────────────────────────────────────────────────────
 function mount(d, status){
   try{
-    DATA=d;
-    DATA._status=status;
+    DATA=d; DATA._status=status;
     listings=(d.listings||[]).map(enrichListing).filter(l=>l.is_active!==false);
-    // Show app FIRST so charts can measure canvas dimensions
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('api-badge').textContent=status==='live'?'LIVE':'MOCK';
     document.getElementById('api-badge').className='api-badge '+(status==='live'?'live':'mock');
     applyTranslations();
+    buildSourceButtons(d.availableSources||[]);
     renderAll(d);
-    // Wire filter events
-    ['search-input','filter-district','filter-type','filter-ring','filter-seller',
-     'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
+    ['search-input','filter-district','filter-borough','filter-type','filter-ring','filter-region',
+     'filter-seller','filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
      'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
       const el=document.getElementById(id);
       if(el) el.addEventListener(el.tagName==='SELECT'?'change':'input',()=>{page=1;renderListings();});
@@ -788,18 +1362,27 @@ function mount(d, status){
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 async function boot(){
   try{
-    const [ovR,tsR,diR,mvR,lsR,qR]=await Promise.all([
+    // Fetch available sources first
+    const filtersR = await fetch(`${API}/api/market/filter-options`).catch(()=>null);
+    const filtersData = filtersR && filtersR.ok ? await filtersR.json() : null;
+    const availableSources = filtersData?.sources || ['sreality'];
+
+    const [ovR,tsR,diR,mapBR,mapDR,mapHexR,mvR,lsR,qR,geoR]=await Promise.all([
       fetch(`${API}/api/market/overview`),
       fetch(`${API}/api/market/timeseries`),
       fetch(`${API}/api/market/districts`),
+      fetch(`${API}/api/market/map?grain=borough`),
+      fetch(`${API}/api/market/map?grain=district`),
+      fetch(`${API}/api/market/map/hex?grid_size=${encodeURIComponent(hexGridSize)}`),
       fetch(`${API}/api/market/price-movements`),
       fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc`),
       fetch(`${API}/api/market/data-quality`),
+      fetch(`${API}/api/market/geo/prague-city-parts`),
     ]);
     if(!ovR.ok) throw new Error('API unavailable');
     if(!lsR.ok) throw new Error(`Listings API error: ${lsR.status}`);
-    const [ov,ts,di,mv,ls,q]=await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
-    mount({overview:ov,timeseries:ts.data||[],districts:di.data||[],movements:mv.data||[],listings:ls.data||[],quality:q},'live');
+    const [ov,ts,di,mapB,mapD,mapHex,mv,ls,q,geo]=await Promise.all([ovR.json(),tsR.json(),diR.json(),mapBR.json(),mapDR.json(),mapHexR.json(),mvR.json(),lsR.json(),qR.json(),geoR.ok ? geoR.json() : Promise.resolve(null)]);
+    mount({overview:ov,timeseries:ts.data||[],districts:di.data||[],mapBoroughs:mapB.data||[],mapDistricts:mapD.data||[],mapHex:mapHex,movements:mv.data||[],listings:ls.data||[],quality:q,availableSources,pragueGeojson:geo},'live');
   }catch(e){
     console.warn('[Dashboard] API unavailable, using mock data:',e.message);
     mount(makeMock(),'mock');
