@@ -793,10 +793,11 @@ async function boot(){
       fetch(`${API}/api/market/timeseries`),
       fetch(`${API}/api/market/districts`),
       fetch(`${API}/api/market/price-movements`),
-      fetch(`${API}/api/listings?per_page=2000&sort_by=listing_duration_days&sort_order=asc`),
+      fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc`),
       fetch(`${API}/api/market/data-quality`),
     ]);
     if(!ovR.ok) throw new Error('API unavailable');
+    if(!lsR.ok) throw new Error(`Listings API error: ${lsR.status}`);
     const [ov,ts,di,mv,ls,q]=await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
     mount({overview:ov,timeseries:ts.data||[],districts:di.data||[],movements:mv.data||[],listings:ls.data||[],quality:q},'live');
   }catch(e){
