@@ -143,6 +143,14 @@ tr:hover td{background:var(--bg-card2)}
       <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Median Kč/m² by District</div><div class="chart-box" style="height:260px"><canvas id="chart-district-price"></canvas></div></div>
     </div>
 
+    <!-- Property Type Breakdown -->
+    <div class="sec-hdr">Property Type Breakdown</div>
+    <div class="grid g3">
+      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Listings by Type</div><div class="chart-box"><canvas id="chart-type-count"></canvas></div></div>
+      <div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Median Price by Type</div><div class="chart-box"><canvas id="chart-type-price"></canvas></div></div>
+      <div class="card" id="type-stats-card"><div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--t2)">Type Summary</div><div id="type-stats-body"></div></div>
+    </div>
+
     <!-- Market Movements -->
     <div class="sec-hdr">Market Movements</div>
     <div class="card">
@@ -153,24 +161,57 @@ tr:hover td{background:var(--bg-card2)}
     <!-- Active Listings -->
     <div class="sec-hdr">Active Listings</div>
     <div class="card">
-      <div class="filter-bar" style="margin-bottom:14px">
+      <div class="filter-bar" style="margin-bottom:10px">
         <input type="text" id="search-input" placeholder="Search title, district…" style="flex:1;min-width:200px"/>
         <select id="filter-district"><option value="">All Districts</option></select>
         <select id="filter-type"><option value="">All Types</option></select>
+        <select id="filter-ring">
+          <option value="">All Rings</option>
+          <option value="inner">Inner</option>
+          <option value="central">Central</option>
+          <option value="middle">Middle</option>
+          <option value="outer">Outer</option>
+        </select>
         <select id="filter-seller"><option value="">All Sellers</option></select>
+        <button class="btn btn-sm" onclick="resetFilters()">Reset</button>
+      </div>
+      <div class="filter-bar" style="margin-bottom:14px">
+        <select id="filter-bedrooms">
+          <option value="">Any Bedrooms</option>
+          <option value="0">Studio (1+kk)</option>
+          <option value="1">1 bed</option>
+          <option value="2">2 bed</option>
+          <option value="3">3 bed</option>
+          <option value="4">4+ bed</option>
+        </select>
+        <select id="filter-tier">
+          <option value="">All Price Tiers</option>
+          <option value="budget">Budget (&lt;5M)</option>
+          <option value="mid">Mid (5–10M)</option>
+          <option value="premium">Premium (10–20M)</option>
+          <option value="luxury">Luxury (&gt;20M)</option>
+        </select>
         <input type="number" id="filter-price-min" placeholder="Min price (CZK)"/>
         <input type="number" id="filter-price-max" placeholder="Max price (CZK)"/>
-        <button class="btn btn-sm" onclick="resetFilters()">Reset</button>
+        <input type="number" id="filter-area-min" placeholder="Min m²"/>
+        <input type="number" id="filter-area-max" placeholder="Max m²"/>
+        <select id="filter-newbuild">
+          <option value="">Any Build</option>
+          <option value="1">New Build Only</option>
+          <option value="0">Resale Only</option>
+        </select>
       </div>
       <div class="tbl-wrap"><table id="listings-table">
         <thead><tr>
           <th onclick="sortListings('title')">Title ↕</th>
           <th onclick="sortListings('district_name')">District ↕</th>
+          <th onclick="sortListings('prague_ring')">Ring ↕</th>
           <th onclick="sortListings('layout_type')">Layout ↕</th>
           <th onclick="sortListings('area_m2')">Area ↕</th>
           <th onclick="sortListings('price_czk')">Price ↕</th>
           <th onclick="sortListings('price_per_m2_czk')">Kč/m² ↕</th>
-          <th onclick="sortListings('listing_duration_days')">Days on Market ↕</th>
+          <th onclick="sortListings('price_tier')">Tier ↕</th>
+          <th onclick="sortListings('listing_duration_days')">Days ↕</th>
           <th>Link</th>
         </tr></thead>
         <tbody id="listings-body"></tbody>
@@ -214,22 +255,29 @@ function makeMock() {
     {n:'Praha 9',ppm2:95000, base:5400000},  {n:'Praha 10',ppm2:105000,base:6200000},
   ];
   const layouts = ['1+kk','2+kk','2+1','3+kk','3+1','4+kk'];
-  const types = ['byty','byty','byty','domy','pozemky','komercni prostory'];
+  const types = ['byty','byty','byty','byty','domy','pozemky','komercni prostory'];
   const sellers = ['agent','private','developer'];
+  const rings = {1:'inner',2:'inner',3:'central',4:'central',5:'central',6:'central',7:'middle',8:'middle',9:'middle',10:'outer'};
   let id = 1;
   function listing() {
     const d = districts[Math.floor(Math.random()*districts.length)];
     const layout = layouts[Math.floor(Math.random()*layouts.length)];
     const area = 35 + Math.floor(Math.random()*130);
     const price = Math.round(d.ppm2 * area * (0.85 + Math.random()*0.3) / 10000) * 10000;
+    const bedrooms = {'1+kk':1,'2+kk':2,'2+1':2,'3+kk':3,'3+1':3,'4+kk':4}[layout]||1;
+    const tier = price<5e6?'budget':price<10e6?'mid':price<20e6?'premium':'luxury';
+    const distNum = parseInt((d.n.match(/\d+/)||[0])[0]);
     return {
       composite_id: 'mock_' + (id++),
       source: 'sreality',
       property_type: types[Math.floor(Math.random()*types.length)],
       district_name: d.n, borough_name: d.n,
       title: `Prodej bytu ${layout}, ${area} m², ${d.n}`,
-      layout_type: layout, area_m2: area,
+      layout_type: layout, area_m2: area, bedroom_count: bedrooms,
       price_czk: price, price_per_m2_czk: Math.round(price/area),
+      price_tier: tier,
+      prague_ring: rings[distNum]||'outer',
+      is_new_build: Math.random()<0.2,
       seller_type: sellers[Math.floor(Math.random()*sellers.length)],
       listing_duration_days: Math.floor(Math.random()*90),
       is_active: true, property_link: '#',
@@ -284,10 +332,13 @@ const CHART_DEFAULTS = {
   animation:{duration:400},
 };
 function makeChart(id, type, data, extra={}) {
+  if (typeof Chart === 'undefined') return; // CDN blocked/slow — skip silently
   if (charts[id]) charts[id].destroy();
   const ctx = document.getElementById(id);
   if (!ctx) return;
-  charts[id] = new Chart(ctx, {type, data, options:{...CHART_DEFAULTS, ...extra, plugins:{...CHART_DEFAULTS.plugins,...(extra.plugins||{})}}});
+  try {
+    charts[id] = new Chart(ctx, {type, data, options:{...CHART_DEFAULTS, ...extra, plugins:{...CHART_DEFAULTS.plugins,...(extra.plugins||{})}}});
+  } catch(e) { console.warn('[Chart]', id, e.message); }
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
@@ -344,6 +395,66 @@ function renderCharts(timeseries, districts) {
   },{indexAxis:'y',scales:{x:{...CHART_DEFAULTS.scales.x,ticks:{...CHART_DEFAULTS.scales.x.ticks,callback:v=>(v/1000).toFixed(0)+'k'}},y:{...CHART_DEFAULTS.scales.y,ticks:{...CHART_DEFAULTS.scales.y.ticks,font:{size:11}}}}});
 }
 
+function renderPropertyBreakdown(allListings) {
+  const typeColors = ['rgba(107,143,255,0.8)','rgba(110,231,183,0.8)','rgba(247,212,124,0.8)','rgba(167,139,250,0.8)','rgba(255,112,112,0.8)','rgba(94,202,220,0.8)'];
+  const grouped = {};
+  allListings.forEach(l => {
+    const t = l.property_type||'unknown';
+    if (!grouped[t]) grouped[t] = [];
+    grouped[t].push(l);
+  });
+  const types = Object.keys(grouped).sort((a,b) => grouped[b].length - grouped[a].length);
+  const counts = types.map(t => grouped[t].length);
+  const medians = types.map(t => {
+    const prices = grouped[t].map(l=>l.price_czk).filter(p=>p!=null).sort((a,b)=>a-b);
+    return prices.length ? prices[Math.floor(prices.length/2)] : 0;
+  });
+
+  const DOUGHNUT_OPTS = {
+    plugins:{legend:{display:true,position:'right',labels:{color:'#8fa3cc',font:{size:11},boxWidth:12,padding:8}}},
+    animation:{duration:400},
+  };
+  makeChart('chart-type-count','doughnut',{
+    labels: types,
+    datasets:[{data:counts, backgroundColor:typeColors, borderWidth:1, borderColor:'rgba(0,0,0,0.2)'}]
+  }, DOUGHNUT_OPTS);
+
+  makeChart('chart-type-price','bar',{
+    labels: types,
+    datasets:[{
+      label:'Median Price',
+      data: medians,
+      backgroundColor: typeColors,
+      borderRadius: 5,
+    }]
+  },{
+    scales:{
+      x:{...CHART_DEFAULTS.scales.x},
+      y:{...CHART_DEFAULTS.scales.y, ticks:{...CHART_DEFAULTS.scales.y.ticks, callback:v=>(v/1e6).toFixed(1)+'M'}}
+    },
+    plugins:{...CHART_DEFAULTS.plugins, legend:{display:false}},
+  });
+
+  const tierColors = {budget:'var(--green)',mid:'var(--blue)',premium:'var(--yellow)',luxury:'var(--purple)'};
+  document.getElementById('type-stats-body').innerHTML = types.map((t,i) => {
+    const items = grouped[t];
+    const prices = items.map(l=>l.price_czk).filter(p=>p!=null).sort((a,b)=>a-b);
+    const med = prices.length ? prices[Math.floor(prices.length/2)] : null;
+    const avgArea = items.reduce((s,l)=>s+(l.area_m2||0),0) / (items.filter(l=>l.area_m2).length||1);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:10px;height:10px;border-radius:50%;background:${typeColors[i%typeColors.length]};flex-shrink:0"></div>
+      <div style="flex:1;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t}</div>
+      <div style="font-size:12px;color:var(--blue);font-weight:600">${items.length}</div>
+      <div style="font-size:11px;color:var(--t3);min-width:60px;text-align:right">${med!=null?FMT.m(med):'n/a'}</div>
+    </div>`;
+  }).join('') + `<div style="font-size:11px;color:var(--t3);padding-top:8px">count · median price</div>`;
+}
+
+function tierBadge(tier) {
+  const m = {budget:'badge-green',mid:'badge-blue',premium:'badge-yellow',luxury:'badge-purple'};
+  return tier ? `<span class="badge ${m[tier]||'badge-blue'}">${tier}</span>` : '-';
+}
+
 function movBadge(t) {
   const m={new:'badge-green',removed:'badge-red',price_reduction:'badge-yellow',price_increase:'badge-blue'};
   const l={new:'New',removed:'Removed',price_reduction:'Price ↓',price_increase:'Price ↑'};
@@ -369,20 +480,38 @@ function renderMovements(movements) {
 function setMovFilter(f) { movFilter=f; renderMovements(DATA.movements); }
 
 function renderListings() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const dist   = document.getElementById('filter-district').value;
-  const type   = document.getElementById('filter-type').value;
-  const seller = document.getElementById('filter-seller').value;
-  const pMin   = +document.getElementById('filter-price-min').value || 0;
-  const pMax   = +document.getElementById('filter-price-max').value || Infinity;
+  const search   = document.getElementById('search-input').value.toLowerCase();
+  const dist     = document.getElementById('filter-district').value;
+  const type     = document.getElementById('filter-type').value;
+  const ring     = document.getElementById('filter-ring').value;
+  const seller   = document.getElementById('filter-seller').value;
+  const beds     = document.getElementById('filter-bedrooms').value;
+  const tier     = document.getElementById('filter-tier').value;
+  const pMin     = +document.getElementById('filter-price-min').value || 0;
+  const pMax     = +document.getElementById('filter-price-max').value || Infinity;
+  const aMin     = +document.getElementById('filter-area-min').value || 0;
+  const aMax     = +document.getElementById('filter-area-max').value || Infinity;
+  const newbuild = document.getElementById('filter-newbuild').value;
 
-  filteredListings = listings.filter(l =>
-    (!search || (l.title||'').toLowerCase().includes(search) || (l.district_name||'').toLowerCase().includes(search)) &&
-    (!dist   || l.district_name===dist) &&
-    (!type   || l.property_type===type) &&
-    (!seller || l.seller_type===seller) &&
-    (l.price_czk==null || (l.price_czk>=pMin && l.price_czk<=pMax))
-  );
+  filteredListings = listings.filter(l => {
+    if (search && !(l.title||'').toLowerCase().includes(search) && !(l.district_name||'').toLowerCase().includes(search)) return false;
+    if (dist   && l.district_name!==dist)   return false;
+    if (type   && l.property_type!==type)   return false;
+    if (ring   && l.prague_ring!==ring)     return false;
+    if (seller && l.seller_type!==seller)   return false;
+    if (tier   && l.price_tier!==tier)      return false;
+    if (beds !== '') {
+      const b = l.bedroom_count??0;
+      if (beds==='0' && !(b===0||b===1&&l.layout_type&&l.layout_type.includes('kk'))) return false;
+      if (beds==='4' && b<4) return false;
+      if (beds!=='0'&&beds!=='4' && b!==+beds) return false;
+    }
+    if (l.price_czk!=null && (l.price_czk<pMin || l.price_czk>pMax)) return false;
+    if (l.area_m2!=null  && (l.area_m2<aMin   || l.area_m2>aMax))   return false;
+    if (newbuild==='1' && !l.is_new_build) return false;
+    if (newbuild==='0' && l.is_new_build)  return false;
+    return true;
+  });
 
   filteredListings.sort((a,b)=>{
     const av=a[sortCol], bv=b[sortCol];
@@ -403,12 +532,14 @@ function renderListings() {
     const pctHtml = l.price_change_pct!=null
       ? `<span style="font-size:11px;color:${l.price_change_pct<0?'var(--red)':'var(--green)'}"> (${l.price_change_pct>0?'+':''}${l.price_change_pct.toFixed(1)}%)</span>` : '';
     return `<tr>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${l.title||''}">${l.title||'-'}</td>
       <td>${l.district_name||'-'}</td>
+      <td style="font-size:11px;color:var(--t3)">${l.prague_ring||'-'}</td>
       <td>${l.layout_type||'-'}</td>
       <td>${l.area_m2!=null?l.area_m2+' m²':'-'}</td>
       <td>${FMT.czk(l.price_czk)}${pctHtml}</td>
       <td>${l.price_per_m2_czk!=null?FMT.int(l.price_per_m2_czk)+' Kč/m²':'-'}</td>
+      <td>${tierBadge(l.price_tier)}</td>
       <td>${FMT.day(l.listing_duration_days)}</td>
       <td>${l.property_link&&l.property_link!=='#'?`<a href="${l.property_link}" target="_blank">View →</a>`:'-'}</td>
     </tr>`;
@@ -418,7 +549,9 @@ function renderListings() {
 function sortListings(col) { if(sortCol===col) sortAsc=!sortAsc; else{sortCol=col;sortAsc=true;} page=1; renderListings(); }
 function changePage(d) { page+=d; renderListings(); }
 function resetFilters() {
-  ['search-input','filter-district','filter-type','filter-seller','filter-price-min','filter-price-max'].forEach(id=>{
+  ['search-input','filter-district','filter-type','filter-ring','filter-seller',
+   'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
+   'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
   page=1; renderListings();
@@ -455,7 +588,7 @@ function renderQuality(q) {
   `;
 }
 
-function mount(d, status) {
+function _mount(d, status) {
   DATA = d;
   listings = (d.listings||[]).filter(l=>l.is_active!==false);
 
@@ -472,38 +605,66 @@ function mount(d, status) {
 
   renderKPIs(ov);
   renderCharts(d.timeseries||[], d.districts||[]);
+  renderPropertyBreakdown(listings);
   renderMovements(d.movements||[]);
   populateFilterOptions(listings);
   renderListings();
   renderQuality(d.quality||{});
 
-  document.getElementById('search-input').addEventListener('input', ()=>{page=1;renderListings();});
-  document.getElementById('filter-district').addEventListener('change', ()=>{page=1;renderListings();});
-  document.getElementById('filter-type').addEventListener('change', ()=>{page=1;renderListings();});
-  document.getElementById('filter-seller').addEventListener('change', ()=>{page=1;renderListings();});
-  document.getElementById('filter-price-min').addEventListener('input', ()=>{page=1;renderListings();});
-  document.getElementById('filter-price-max').addEventListener('input', ()=>{page=1;renderListings();});
+  ['search-input','filter-district','filter-type','filter-ring','filter-seller',
+   'filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
+   'filter-area-min','filter-area-max','filter-newbuild'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(el.tagName==='SELECT'?'change':'input', ()=>{page=1;renderListings();});
+  });
 
   document.getElementById('loading').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
 }
 
+function mount(d, status) {
+  try { _mount(d, status); }
+  catch(e) {
+    console.error('[Dashboard] render error:', e);
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+  }
+}
+
 // ─── BOOT ────────────────────────────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  console.error('[Dashboard]', msg);
+}
+
 async function boot() {
   try {
-    const [ovR,tsR,diR,mvR,lsR,qR] = await Promise.all([
-      fetch(`${API}/api/market/overview`),
-      fetch(`${API}/api/market/timeseries`),
-      fetch(`${API}/api/market/districts`),
-      fetch(`${API}/api/market/price-movements`),
-      fetch(`${API}/api/listings?per_page=2000&sort_by=listing_duration_days&sort_order=asc`),
-      fetch(`${API}/api/market/data-quality`),
-    ]);
-    if (!ovR.ok) throw new Error('API unavailable');
-    const [ov,ts,di,mv,ls,q] = await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
-    mount({overview:ov, timeseries:ts.data||[], districts:di.data||[], movements:mv.data||[], listings:ls.data||[], quality:q}, 'live');
+    // Try live API first
+    let data, status;
+    try {
+      const [ovR,tsR,diR,mvR,lsR,qR] = await Promise.all([
+        fetch(`${API}/api/market/overview`),
+        fetch(`${API}/api/market/timeseries`),
+        fetch(`${API}/api/market/districts`),
+        fetch(`${API}/api/market/price-movements`),
+        fetch(`${API}/api/listings?per_page=2000&sort_by=listing_duration_days&sort_order=asc`),
+        fetch(`${API}/api/market/data-quality`),
+      ]);
+      if (!ovR.ok) throw new Error('API unavailable');
+      const [ov,ts,di,mv,ls,q] = await Promise.all([ovR.json(),tsR.json(),diR.json(),mvR.json(),lsR.json(),qR.json()]);
+      data = {overview:ov, timeseries:ts.data||[], districts:di.data||[], movements:mv.data||[], listings:ls.data||[], quality:q};
+      status = 'live';
+    } catch(apiErr) {
+      console.warn('[Dashboard] API unavailable, using mock data:', apiErr.message);
+      data = makeMock();
+      status = 'mock';
+    }
+    mount(data, status);
   } catch(e) {
-    mount(makeMock(), 'mock');
+    // mount() itself threw — still show the app with whatever rendered
+    console.error('[Dashboard] mount error:', e);
+    showError(e.message);
   }
 }
 
