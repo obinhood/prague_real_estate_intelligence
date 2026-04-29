@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from src.config import CONFIG
 from src.utils.helpers import clean_text, safe_float, json_dumps_safe
+from src.utils.process_csv import looks_like_listing_title
 from src.utils.logger import get_logger
 
 logger = get_logger("sreality")
@@ -60,9 +61,11 @@ class SrealityAdapter:
         html = self.fetch(base_url)
         soup = BeautifulSoup(html, "html.parser")
         numbers = []
-        for a in soup.find_all("a"):
+        for a in soup.find_all("a", href=True):
+            href = a.get("href", "")
             txt = clean_text(a.get_text())
-            if txt and txt.isdigit():
+            # Only count anchor text as a page number when the link itself is a pagination link
+            if ("strana=" in href or "/strana-" in href or "page=" in href) and txt and txt.isdigit():
                 numbers.append(int(txt))
         detected = max(numbers) if numbers else 1
         logger.info(f"Detected max pages for {base_url}: {detected}")
@@ -81,7 +84,7 @@ class SrealityAdapter:
                 continue
             seen.add(composite_id)
             title = clean_text(a.get_text(" ", strip=True))
-            if not title or "Prodej" not in title:
+            if not looks_like_listing_title(title):
                 continue
             rows.append({
                 "composite_id": composite_id,

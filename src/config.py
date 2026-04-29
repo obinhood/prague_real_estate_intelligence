@@ -1,5 +1,11 @@
+import os
+
+
 CONFIG = {
-    "database_url": "sqlite:///data/housing.db",
+    "database_url": os.getenv(
+        "DATABASE_URL",
+        "postgresql+psycopg2://obinhood:Qmwn1234@localhost:5432/prague_real_estate",
+    ),
     "max_pages": None,
     "enable_detail_scraping": True,
     "max_workers_listing_details": 4,

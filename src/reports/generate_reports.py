@@ -11,7 +11,7 @@ def generate_daily_price_csv(history_df, output_path="data/daily_price_report.cs
         return output_path
     active = history_df[history_df["exists_on_source"] == True].copy()
     report = (
-        active.groupby(["scraped_at", "source", "property_type", "district_name"], dropna=False)
+        active.groupby(["scraped_at", "source", "property_type", "district_name", "borough_name"], dropna=False)
         .agg(
             listing_count=("composite_id", "count"),
             total_market_value_czk=("price_czk", "sum"),
@@ -40,7 +40,7 @@ def generate_removed_listings_csv(current_df, output_path="data/removed_listings
         return output_path
     keep_cols = [c for c in [
         "composite_id", "source", "property_type", "property_link", "title",
-        "full_address", "district_name", "prague_zone", "price_czk",
+        "full_address", "district_name", "borough_name", "prague_zone", "price_czk",
         "first_seen_at", "removed_at", "removed_duration_days", "seller_type"
     ] if c in removed.columns]
     removed = removed[keep_cols].sort_values(["removed_at", "source", "property_type"], ascending=[False, True, True])
@@ -70,7 +70,7 @@ def generate_market_report_html(current_df, output_path="data/market_report.html
     )
     by_district = (
         active.dropna(subset=["district_name"])
-        .groupby(["district_name", "property_type"], as_index=False)
+        .groupby(["district_name", "borough_name", "property_type"], as_index=False)
         .agg(
             listing_count=("composite_id", "count"),
             total_market_value_czk=("price_czk", "sum"),

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Prague Real Estate Intelligence</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/recharts@2.12.4/umd/Recharts.js"></script>
+<style>
+  :root{
+    --bg:#070b14;--bg-card:#0d1526;--bg-card2:#111e35;--bg-sidebar:#090e1c;
+    --border:rgba(92,120,200,0.16);--border-hover:rgba(110,145,240,0.32);
+    --text:#e8efff;--text-2:#8fa3cc;--text-3:#5a6e96;
+    --blue:#6b8fff;--green:#6ee7b7;--red:#ff7070;--yellow:#f7d47c;--purple:#a78bfa;
+    --blue-dim:rgba(107,143,255,0.12);--green-dim:rgba(110,231,183,0.12);
+    --red-dim:rgba(255,112,112,0.12);--yellow-dim:rgba(247,212,124,0.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.5;overflow-x:hidden}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:var(--bg-card)}
+  ::-webkit-scrollbar-thumb{background:rgba(107,143,255,0.3);border-radius:3px}
+  input,select{background:var(--bg-card2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;width:100%}
+  input:focus,select:focus{border-color:var(--blue)}
+  button{cursor:pointer;border:none;outline:none}
+  a{color:var(--blue);text-decoration:none}
+  a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+const {
+  LineChart, Line, BarChart, Bar, ComposedChart, Area, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine,
+  Cell, Brush
+} = Recharts;
+
+// ─── MOCK DATA ───────────────────────────────────────────────────────────────
+const DISTRICTS = [
+  {d:"Praha 1", b:"Staré Město",  ppM2:175000, base:12000000},
+  {d:"Praha 2", b:"Vinohrady",    ppM2:148000, base:9500000},
+  {d:"Praha 3", b:"Žižkov",       ppM2:118000, base:7200000},
+  {d:"Praha 4", b:"Nusle",        ppM2:107000, base:6800000},
+  {d:"Praha 5", b:"Smíchov",      ppM2:119000, base:7600000},
+  {d:"Praha 6", b:"Dejvice",      ppM2:132000, base:9100000},
+  {d:"Praha 7", b:"Holešovice",   ppM2:124000, base:8200000},
+  {d:"Praha 8", b:"Karlín",       ppM2:116000, base:7800000},
+  {d:"Praha 9", b:"Vysočany",     ppM2:95000,  base:5400000},
+  {d:"Praha 10",b:"Strašnice",    ppM2:105000, base:6200000},
+  {d:"Praha 11",b:"Chodov",       ppM2:87000,  base:4800000},
+  {d:"Praha 12",b:"Modřany",      ppM2:82000,  base:4400000},
+  {d:"Praha 13",b:"Stodůlky",     ppM2:85000,  base:4600000},
+];
+
+function rnd(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function rndF(min,max,dp=0){const v=Math.random()*(max-min)+min;return dp?+v.toFixed(dp):Math.round(v);}
+
+let _id=1;
+function makeListing(snap,isNew=false,isRemoved=false,priceChange=null){
+  const di=DISTRICTS[rnd(0,DISTRICTS.length-1)];
+  const layouts=["1+kk","2+kk","2+1","3+kk","3+1","4+kk","4+1"];
+  const layout=layouts[rnd(0,layouts.length-1)];
+  const types=["byty","byty","byty","domy","pozemky","komercni prostory"];
+  const type=types[rnd(0,types.length-1)];
+  const sellers=["owner","owner","agency"];
+  const area=type==="domy"?rnd(140,280):type==="pozemky"?rnd(300,1200):rnd(38,110);
+  const basePrice=type==="domy"?rnd(12000000,28000000):type==="pozemky"?rnd(1200000,7500000):Math.round(di.base*rndF(0.82,1.18));
+  const price=priceChange?basePrice+priceChange:basePrice;
+  const firstSeen=snap==="2026-04-27"?snap:(snap==="2026-04-28"&&isNew)?"2026-04-28":"2026-04-27";
+  const dom=snap==="2026-04-27"?rnd(0,120):firstSeen==="2026-04-28"?rnd(0,1):rnd(1,121);
+  return {
+    composite_id:`listing_${_id++}`,
+    source:rnd(0,1)?"sreality":"bezrealitky",
+    property_type:type,
+    district_name:di.d,
+    borough_name:di.b,
+    title:`Prodej ${type==="byty"?"bytu":type==="domy"?"domu":"pozemku"} ${layout}, ${area} m² – ${di.b}, ${di.d}`,
+    price_czk:price,
+    price_per_m2_czk:type!=="pozemky"?Math.round(price/area):null,
+    area_m2:area,
+    layout_type:layout,
+    seller_type:sellers[rnd(0,sellers.length-1)],
+    listing_duration_days:dom,
+    first_seen_at:firstSeen,
+    snapshot_date:snap,
+    is_active:!isRemoved,
+    is_removed:isRemoved,
+    location_quality:rnd(0,8)===0?"missing_borough":"ok",
+    has_balcony:!!rnd(0,1),has_parking:!!rnd(0,1),has_terrace:!!rnd(0,1),has_elevator:!!rnd(0,1),
+    energy_class:["A","B","C","D","E"][rnd(0,4)],
+    floor:type==="byty"?rnd(1,12):null,
+    property_link:"#",
+    prev_price:priceChange?basePrice:null,
+    price_change:priceChange,
+  };
+}
+
+// Generate realistic multi-snapshot dataset
+function generateData(){
+  const snaps=["2026-04-27","2026-04-28","2026-04-29"];
+  const base=[]; for(let i=0;i<220;i++) base.push(makeListing("2026-04-27"));
+
+  let snap27=[...base];
+  let snap28=[...base.slice(0,212)];
+  for(let i=0;i<18;i++) snap28.push(makeListing("2026-04-28",true));
+  // price changes on 28
+  for(let i=5;i<13;i++){const l={...snap28[i],price_czk:snap28[i].price_czk-rnd(50000,300000),price_change:-rnd(50000,300000),prev_price:snap28[i].price_czk};snap28[i]=l;}
+  for(let i=14;i<19;i++){const l={...snap28[i],price_czk:snap28[i].price_czk+rnd(50000,200000),price_change:rnd(50000,200000),prev_price:snap28[i].price_czk};snap28[i]=l;}
+
+  let snap29=[...snap28.slice(0,224)];
+  for(let i=0;i<14;i++) snap29.push(makeListing("2026-04-29",true));
+  for(let i=3;i<9;i++){const l={...snap29[i],price_czk:snap29[i].price_czk-rnd(30000,250000),price_change:-rnd(30000,250000),prev_price:snap29[i].price_czk};snap29[i]=l;}
+  for(let i=10;i<14;i++){const l={...snap29[i],price_czk:snap29[i].price_czk+rnd(80000,350000),price_change:rnd(80000,350000),prev_price:snap29[i].price_czk};snap29[i]=l;}
+
+  const allListings=[...snap29];
+
+  function buildSnap(arr,date){
+    const grouped={};
+    DISTRICTS.forEach(({d,b})=>{
+      const ds=arr.filter(l=>l.district_name===d);
+      const prices=ds.map(l=>l.price_czk).filter(Boolean).sort((a,b)=>a-b);
+      const ppM2=ds.map(l=>l.price_per_m2_czk).filter(Boolean).sort((a,b)=>a-b);
+      grouped[d]={
+        district_name:d,borough_name:b,
+        active_listings:ds.length,
+        total_market_value_czk:prices.reduce((s,v)=>s+v,0),
+        median_price_czk:prices.length?prices[Math.floor(prices.length/2)]:null,
+        median_price_per_m2_czk:ppM2.length?ppM2[Math.floor(ppM2.length/2)]:null,
+        average_days_on_market:ds.length?Math.round(ds.reduce((s,l)=>s+(l.listing_duration_days||0),0)/ds.length):null,
+      };
+    });
+    return Object.values(grouped);
+  }
+
+  const timeseries=[
+    {snapshot_date:"2026-04-27",active_listings:snap27.length,new_listings:snap27.length,removed_listings:0,price_increases:0,price_reductions:0,
+     total_market_value_czk:snap27.reduce((s,l)=>s+(l.price_czk||0),0),
+     median_price_czk:snap27.map(l=>l.price_czk).filter(Boolean).sort((a,b)=>a-b)[Math.floor(snap27.length/2)],
+     average_price_czk:Math.round(snap27.reduce((s,l)=>s+(l.price_czk||0),0)/snap27.length),
+     median_price_per_m2_czk:115000},
+    {snapshot_date:"2026-04-28",active_listings:snap28.length,new_listings:18,removed_listings:8,price_increases:5,price_reductions:8,
+     total_market_value_czk:snap28.reduce((s,l)=>s+(l.price_czk||0),0),
+     median_price_czk:snap28.map(l=>l.price_czk).filter(Boolean).sort((a,b)=>a-b)[Math.floor(snap28.length/2)],
+     average_price_czk:Math.round(snap28.reduce((s,l)=>s+(l.price_czk||0),0)/snap28.length),
+     median_price_per_m2_czk:114200},
+    {snapshot_date:"2026-04-29",active_listings:snap29.length,new_listings:14,removed_listings:6,price_increases:4,price_reductions:6,
+     total_market_value_czk:snap29.reduce((s,l)=>s+(l.price_czk||0),0),
+     median_price_czk:snap29.map(l=>l.price_czk).filter(Boolean).sort((a,b)=>a-b)[Math.floor(snap29.length/2)],
+     average_price_czk:Math.round(snap29.reduce((s,l)=>s+(l.price_czk||0),0)/snap29.length),
+     median_price_per_m2_czk:115800},
+  ];
+
+  const prev=timeseries[1], curr=timeseries[2];
+  const movements=[
+    ...snap29.slice(224).map(l=>({...l,movement:"new"})),
+    ...snap28.slice(212,220).map(l=>({...l,movement:"removed"})),
+    ...snap29.filter(l=>l.price_change&&l.price_change<0).slice(0,6).map(l=>({...l,movement:"price_reduction",price_change_amount:l.price_change,price_change_percentage:l.price_change/l.prev_price*100})),
+    ...snap29.filter(l=>l.price_change&&l.price_change>0).slice(0,4).map(l=>({...l,movement:"price_increase",price_change_amount:l.price_change,price_change_percentage:l.price_change/l.prev_price*100})),
+  ];
+
+  const overview={
+    latest_snapshot_date:"2026-04-29",
+    previous_snapshot_date:"2026-04-28",
+    active_listings:{current:curr.active_listings,previous:prev.active_listings,delta:curr.active_listings-prev.active_listings,pct_change:+((curr.active_listings-prev.active_listings)/prev.active_listings*100).toFixed(2)},
+    total_market_value:{current:curr.total_market_value_czk,previous:prev.total_market_value_czk,delta:curr.total_market_value_czk-prev.total_market_value_czk,pct_change:+((curr.total_market_value_czk-prev.total_market_value_czk)/prev.total_market_value_czk*100).toFixed(2)},
+    median_listing_price:{current:curr.median_price_czk,previous:prev.median_price_czk,delta:curr.median_price_czk-prev.median_price_czk,pct_change:+((curr.median_price_czk-prev.median_price_czk)/prev.median_price_czk*100).toFixed(2)},
+    average_listing_price:{current:curr.average_price_czk,previous:prev.average_price_czk,delta:curr.average_price_czk-prev.average_price_czk,pct_change:+((curr.average_price_czk-prev.average_price_czk)/prev.average_price_czk*100).toFixed(2)},
+    median_price_per_sqm:{current:curr.median_price_per_m2_czk,previous:prev.median_price_per_m2_czk,delta:curr.median_price_per_m2_czk-prev.median_price_per_m2_czk,pct_change:+((curr.median_price_per_m2_czk-prev.median_price_per_m2_czk)/prev.median_price_per_m2_czk*100).toFixed(2)},
+    new_listings:curr.new_listings,
+    removed_listings:curr.removed_listings,
+    price_increases:curr.price_increases,
+    price_reductions:curr.price_reductions,
+    days_on_market_median:47,
+    days_on_market_avg:52,
+  };
+
+  return {overview,timeseries,districts:buildSnap(snap29,"2026-04-29"),listings:allListings,movements,quality:{total_records:allListings.length,active_records:snap29.length,missing_price:3,missing_area:7,missing_price_per_sqm:18,missing_coordinates:41,location_issues:allListings.filter(l=>l.location_quality!=="ok").length}};
+}
+
+const MOCK = generateData();
+
+// ─── FORMATTERS ───────────────────────────────────────────────────────────────
+const fmtCzk = v => v==null?"n/a":`${Math.round(v).toLocaleString("cs-CZ")} Kč`;
+const fmtM   = v => v==null?"n/a":`${(v/1e6).toFixed(1)} M Kč`;
+const fmtB   = v => v==null?"n/a":`${(v/1e9).toFixed(2)} B Kč`;
+const fmtInt = v => v==null?"n/a":Math.round(v).toLocaleString("cs-CZ");
+const fmtDays= v => v==null?"n/a":`${Math.round(v)} d`;
+const fmtPct = v => v==null?"n/a":`${v>0?"+":""}${v.toFixed(2)}%`;
+const fmtPctInt=v=>v==null?"n/a":`${v>0?"+":""}${Math.round(v)}%`;
+const fmtDate= s => s?s.slice(0,10):"-";
+
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+const S = {
+  card:{background:"var(--bg-card)",border:"1px solid var(--border)",borderRadius:16,padding:"18px 20px"},
+  kpiCard:{background:"linear-gradient(160deg,#0e1830 0%,#08101f 100%)",border:"1px solid var(--border)",borderRadius:18,padding:"18px 20px",minHeight:130,position:"relative",overflow:"hidden"},
+  sectionTitle:{fontSize:15,fontWeight:700,color:"var(--text)",marginBottom:14,letterSpacing:"0.01em"},
+  label:{fontSize:11,color:"var(--text-3)",textTransform:"uppercase",letterSpacing:"0.1em",fontWeight:600},
+  tableCell:{padding:"10px 12px",borderBottom:"1px solid var(--border)",color:"var(--text-2)",fontSize:13,whiteSpace:"nowrap"},
+  tableHead:{padding:"10px 12px",borderBottom:"1px solid rgba(107,143,255,0.3)",color:"var(--blue)",fontSize:12,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.06em",background:"var(--bg-card)",whiteSpace:"nowrap",cursor:"pointer",userSelect:"none"},
+};
+
+const CT = {
+  tooltip:{background:"#0e1830",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px",fontSize:12,color:"var(--text)"},
+  grid:  {stroke:"rgba(92,120,200,0.1)",strokeDasharray:"3 3"},
+  axis:  {stroke:"transparent",tick:{fill:"var(--text-3)",fontSize:11}},
+};
+
+function ChartTooltipBox({active,payload,label,fmt=fmtCzk}){
+  if(!active||!payload?.length) return null;
+  return <div style={CT.tooltip}><div style={{color:"var(--text-2)",marginBottom:6,fontSize:11}}>{label}</div>{payload.map((p,i)=><div key={i} style={{color:p.color||"var(--text)",marginTop:3}}><span style={{opacity:.7}}>{p.name}: </span><strong>{fmt(p.value)}</strong></div>)}</div>;
+}
+
+// ─── KPI CARD ─────────────────────────────────────────────────────────────────
+function KpiCard({label,metric,mainFmt,compact=false}){
+  const {current,delta,pct_change}=metric||{};
+  const up=delta>0, dn=delta<0;
+  const color=up?"var(--green)":dn?"var(--red)":"var(--yellow)";
+  const arrow=up?"↑":dn?"↓":"→";
+  return(
+    <div style={{...S.kpiCard}}>
+      <div style={{...S.label,marginBottom:8}}>{label}</div>
+      <div style={{fontSize:compact?20:24,fontWeight:800,color:"var(--text)",lineHeight:1.1}}>{mainFmt(current)}</div>
+      {delta!=null&&<div style={{marginTop:8,fontSize:13,color,display:"flex",alignItems:"center",gap:4}}>
+        <span>{arrow}</span>
+        <span>{mainFmt(Math.abs(delta))}</span>
+        {pct_change!=null&&<span style={{color:"var(--text-3)",fontSize:11}}>({fmtPct(pct_change)})</span>}
+      </div>}
+      {delta==null&&<div style={{marginTop:8,fontSize:12,color:"var(--text-3)"}}>vs Apr 28</div>}
+      <div style={{position:"absolute",right:14,top:14,fontSize:22,opacity:.07,fontWeight:900}}>#</div>
+    </div>
+  );
+}
+
+function SimpleKpi({label,value,fmt=fmtInt,color="var(--blue)"}){
+  return(
+    <div style={{...S.kpiCard,minHeight:90}}>
+      <div style={{...S.label,marginBottom:6}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:800,color}}>{fmt(value)}</div>
+    </div>
+  );
+}
+
+// ─── MOVEMENT BADGE ───────────────────────────────────────────────────────────
+const MOVE_CFG={
+  new:{label:"New",color:"var(--green)",bg:"var(--green-dim)"},
+  removed:{label:"Removed",color:"var(--red)",bg:"var(--red-dim)"},
+  price_increase:{label:"Price ↑",color:"var(--blue)",bg:"var(--blue-dim)"},
+  price_reduction:{label:"Price ↓",color:"var(--yellow)",bg:"var(--yellow-dim)"},
+};
+function MoveBadge({type}){
+  const c=MOVE_CFG[type]||{label:type,color:"var(--text-2)",bg:"var(--bg-card2)"};
+  return <span style={{background:c.bg,color:c.color,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700}}>{c.label}</span>;
+}
+
+// ─── FILTER SIDEBAR ───────────────────────────────────────────────────────────
+function FilterSidebar({filters,onChange,options,open,onClose}){
+  const set=(k,v)=>onChange({...filters,[k]:v});
+  const sideStyle={
+    position:"fixed",top:0,left:0,height:"100vh",width:280,
+    background:"var(--bg-sidebar)",borderRight:"1px solid var(--border)",
+    overflowY:"auto",zIndex:100,padding:"20px 16px",
+    transform:open?"translateX(0)":"translateX(-100%)",
+    transition:"transform 0.25s ease",
+  };
+  return(
+    <div style={sideStyle}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <span style={{fontWeight:700,fontSize:15}}>Filters</span>
+        <button onClick={onClose} style={{background:"none",color:"var(--text-3)",fontSize:18,padding:"2px 6px"}}>✕</button>
+      </div>
+
+      <FilterGroup label="Date from"><input type="date" value={filters.date_from||""} onChange={e=>set("date_from",e.target.value)}/></FilterGroup>
+      <FilterGroup label="Date to"><input type="date" value={filters.date_to||""} onChange={e=>set("date_to",e.target.value)}/></FilterGroup>
+      <FilterGroup label="Source"><MultiCheck opts={options.sources||[]} val={filters.sources||[]} onChange={v=>set("sources",v)}/></FilterGroup>
+      <FilterGroup label="Property type"><MultiCheck opts={options.property_types||[]} val={filters.property_types||[]} onChange={v=>set("property_types",v)}/></FilterGroup>
+      <FilterGroup label="District"><MultiCheck opts={options.districts||[]} val={filters.districts||[]} onChange={v=>set("districts",v)}/></FilterGroup>
+      <FilterGroup label="Borough"><MultiCheck opts={options.boroughs||[]} val={filters.boroughs||[]} onChange={v=>set("boroughs",v)}/></FilterGroup>
+      <FilterGroup label="Seller"><MultiCheck opts={options.seller_types||[]} val={filters.seller_types||[]} onChange={v=>set("seller_types",v)}/></FilterGroup>
+      <FilterGroup label="Price min (CZK)"><input type="number" placeholder="0" value={filters.price_min||""} onChange={e=>set("price_min",e.target.value?+e.target.value:null)}/></FilterGroup>
+      <FilterGroup label="Price max (CZK)"><input type="number" placeholder="No limit" value={filters.price_max||""} onChange={e=>set("price_max",e.target.value?+e.target.value:null)}/></FilterGroup>
+      <FilterGroup label="Size min (m²)"><input type="number" placeholder="0" value={filters.size_min||""} onChange={e=>set("size_min",e.target.value?+e.target.value:null)}/></FilterGroup>
+      <FilterGroup label="Size max (m²)"><input type="number" placeholder="No limit" value={filters.size_max||""} onChange={e=>set("size_max",e.target.value?+e.target.value:null)}/></FilterGroup>
+
+      <button onClick={()=>onChange({})} style={{marginTop:20,width:"100%",background:"var(--blue-dim)",color:"var(--blue)",border:"1px solid var(--blue)",borderRadius:8,padding:"8px 0",fontWeight:600,fontSize:13}}>Reset all filters</button>
+    </div>
+  );
+}
+function FilterGroup({label,children}){
+  return <div style={{marginBottom:14}}><div style={{...S.label,marginBottom:5}}>{label}</div>{children}</div>;
+}
+function MultiCheck({opts,val,onChange}){
+  const toggle=o=>onChange(val.includes(o)?val.filter(x=>x!==o):[...val,o]);
+  const all=val.length===0||val.length===opts.length;
+  return(
+    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+      {opts.map(o=>{
+        const sel=val.length===0||val.includes(o);
+        return <button key={o} onClick={()=>toggle(o)} style={{fontSize:11,padding:"3px 8px",borderRadius:6,border:`1px solid ${sel?"var(--blue)":"var(--border)"}`,background:sel?"var(--blue-dim)":"transparent",color:sel?"var(--blue)":"var(--text-3)",transition:"all 0.15s"}}>{o}</button>;
+      })}
+    </div>
+  );
+}
+
+// ─── CHARTS SECTION ───────────────────────────────────────────────────────────
+function TrendCharts({timeseries}){
+  if(!timeseries?.length) return <EmptyState msg="Run the pipeline on at least two days to unlock trend charts."/>;
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Active Listings Over Time</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <ComposedChart data={timeseries} margin={{top:4,right:8,bottom:4,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="snapshot_date" {...CT.axis} tickFormatter={d=>d.slice(5)}/>
+            <YAxis {...CT.axis} width={40}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtInt}/>}/>
+            <Legend wrapperStyle={{fontSize:11,color:"var(--text-3)"}}/>
+            <Line type="monotone" dataKey="active_listings" stroke="#6b8fff" strokeWidth={2.5} dot={{r:4,fill:"#6b8fff"}} name="Active"/>
+            <Bar dataKey="new_listings" fill="rgba(110,231,183,0.5)" name="New"/>
+            <Bar dataKey="removed_listings" fill="rgba(255,112,112,0.5)" name="Removed"/>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Median Price + Total Market Value</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={timeseries} margin={{top:4,right:8,bottom:4,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="snapshot_date" {...CT.axis} tickFormatter={d=>d.slice(5)}/>
+            <YAxis yAxisId="left" {...CT.axis} width={55} tickFormatter={v=>`${(v/1e6).toFixed(0)}M`}/>
+            <YAxis yAxisId="right" orientation="right" {...CT.axis} width={55} tickFormatter={v=>`${(v/1e9).toFixed(1)}B`}/>
+            <Tooltip content={<ChartTooltipBox fmt={v=>fmtM(v)}/>}/>
+            <Legend wrapperStyle={{fontSize:11,color:"var(--text-3)"}}/>
+            <Line yAxisId="left" type="monotone" dataKey="median_price_czk" stroke="#f7d47c" strokeWidth={2.5} dot={{r:4}} name="Median price"/>
+            <Line yAxisId="right" type="monotone" dataKey="total_market_value_czk" stroke="#a78bfa" strokeWidth={2} dot={{r:3}} name="Total value" strokeDasharray="5 3"/>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Price per m² Over Time</div>
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={timeseries} margin={{top:4,right:8,bottom:4,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="snapshot_date" {...CT.axis} tickFormatter={d=>d.slice(5)}/>
+            <YAxis {...CT.axis} width={60} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtCzk}/>}/>
+            <Line type="monotone" dataKey="median_price_per_m2_czk" stroke="#6ee7b7" strokeWidth={2.5} dot={{r:4}} name="Median Kč/m²"/>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Market Churn (New vs Removed)</div>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={timeseries.slice(1)} margin={{top:4,right:8,bottom:4,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="snapshot_date" {...CT.axis} tickFormatter={d=>d.slice(5)}/>
+            <YAxis {...CT.axis} width={30}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtInt}/>}/>
+            <Legend wrapperStyle={{fontSize:11,color:"var(--text-3)"}}/>
+            <Bar dataKey="new_listings" fill="#6ee7b7" name="New" radius={[4,4,0,0]}/>
+            <Bar dataKey="removed_listings" fill="#ff7070" name="Removed" radius={[4,4,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ─── DISTRICT SECTION ─────────────────────────────────────────────────────────
+function DistrictSection({districts}){
+  if(!districts?.length) return <EmptyState msg="No district data available."/>;
+  const top=[...districts].sort((a,b)=>(b.active_listings||0)-(a.active_listings||0)).slice(0,13);
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Active Listings by District</div>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={top} layout="vertical" margin={{top:0,right:12,bottom:0,left:70}}>
+            <CartesianGrid {...CT.grid} horizontal={false}/>
+            <XAxis type="number" {...CT.axis} tickFormatter={fmtInt}/>
+            <YAxis type="category" dataKey="district_name" {...CT.axis} width={68}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtInt}/>}/>
+            <Bar dataKey="active_listings" name="Active listings" radius={[0,4,4,0]}>
+              {top.map((_,i)=><Cell key={i} fill={`hsl(${225+i*7},70%,${62-i*2}%)`}/>)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Median Price per m² by District</div>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={[...districts].filter(d=>d.median_price_per_m2_czk).sort((a,b)=>b.median_price_per_m2_czk-a.median_price_per_m2_czk).slice(0,13)} layout="vertical" margin={{top:0,right:12,bottom:0,left:70}}>
+            <CartesianGrid {...CT.grid} horizontal={false}/>
+            <XAxis type="number" {...CT.axis} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+            <YAxis type="category" dataKey="district_name" {...CT.axis} width={68}/>
+            <Tooltip content={<ChartTooltipBox fmt={v=>`${fmtInt(v)} Kč/m²`}/>}/>
+            <Bar dataKey="median_price_per_m2_czk" name="Median Kč/m²" radius={[0,4,4,0]}>
+              {districts.map((_,i)=><Cell key={i} fill={`hsl(${160-i*4},65%,${58-i}%)`}/>)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ─── DISTRIBUTION CHARTS ─────────────────────────────────────────────────────
+function buildHistogram(data,key,bins=20){
+  const vals=data.map(d=>d[key]).filter(v=>v!=null&&v>0);
+  if(!vals.length) return [];
+  const mn=Math.min(...vals), mx=Math.max(...vals);
+  const step=(mx-mn)/bins;
+  const buckets=Array.from({length:bins},(_,i)=>({min:mn+i*step,max:mn+(i+1)*step,count:0}));
+  vals.forEach(v=>{const i=Math.min(Math.floor((v-mn)/step),bins-1);buckets[i].count++;});
+  return buckets.map(b=>({range:`${(b.min/1e6).toFixed(1)}M`,count:b.count}));
+}
+function buildDomHistogram(data,bins=20){
+  const vals=data.map(d=>d.listing_duration_days).filter(v=>v!=null&&v>=0);
+  if(!vals.length) return [];
+  const mx=Math.min(Math.max(...vals),365);
+  const step=mx/bins;
+  const buckets=Array.from({length:bins},(_,i)=>({min:i*step,max:(i+1)*step,count:0}));
+  vals.forEach(v=>{const i=Math.min(Math.floor(v/step),bins-1);buckets[i].count++;});
+  return buckets.map(b=>({range:`${Math.round(b.min)}d`,count:b.count}));
+}
+
+function DistributionCharts({listings}){
+  const priceHist=useMemo(()=>buildHistogram(listings,"price_czk",25),[listings]);
+  const domHist=useMemo(()=>buildDomHistogram(listings,20),[listings]);
+  return(
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Asking Price Distribution</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={priceHist} margin={{top:4,right:8,bottom:20,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="range" {...CT.axis} interval={4} angle={-30} textAnchor="end"/>
+            <YAxis {...CT.axis} width={30}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtInt}/>}/>
+            <Bar dataKey="count" fill="#6b8fff" name="Listings" radius={[3,3,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Days on Market Distribution</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={domHist} margin={{top:4,right:8,bottom:20,left:0}}>
+            <CartesianGrid {...CT.grid}/>
+            <XAxis dataKey="range" {...CT.axis} interval={3} angle={-30} textAnchor="end"/>
+            <YAxis {...CT.axis} width={30}/>
+            <Tooltip content={<ChartTooltipBox fmt={fmtInt}/>}/>
+            <Bar dataKey="count" fill="#f7d47c" name="Listings" radius={[3,3,0,0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// ─── MOVEMENTS TABLE ─────────────────────────────────────────────────────────
+function MovementsSection({movements}){
+  const [show,setShow]=useState("all");
+  const filtered=show==="all"?movements:movements.filter(m=>m.movement===show);
+  const counts=useMemo(()=>{
+    const c={new:0,removed:0,price_increase:0,price_reduction:0};
+    movements.forEach(m=>{if(c[m.movement]!=null)c[m.movement]++;});
+    return c;
+  },[movements]);
+  return(
+    <div style={S.card}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={S.sectionTitle}>Market Movements — Apr 28 → Apr 29</div>
+        <div style={{display:"flex",gap:8,marginLeft:"auto",flexWrap:"wrap"}}>
+          {[["all","All","var(--text-2)"],["new","New "+counts.new,"var(--green)"],["removed","Removed "+counts.removed,"var(--red)"],["price_increase","↑ Price "+counts.price_increase,"var(--blue)"],["price_reduction","↓ Price "+counts.price_reduction,"var(--yellow)"]].map(([k,l,c])=>
+            <button key={k} onClick={()=>setShow(k)} style={{fontSize:12,padding:"4px 12px",borderRadius:8,border:`1px solid ${show===k?c:"var(--border)"}`,background:show===k?`${c}18`:"transparent",color:show===k?c:"var(--text-3)",fontWeight:show===k?600:400}}>{l}</button>
+          )}
+        </div>
+      </div>
+      {filtered.length===0?<EmptyState msg="No movements match this filter."/>:
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>
+            {["Type","District","Borough","Property","Price","Change","DOM"].map(h=><th key={h} style={S.tableHead}>{h}</th>)}
+          </tr></thead>
+          <tbody>{filtered.slice(0,50).map((m,i)=>(
+            <tr key={i} style={{background:i%2?"var(--bg-card2)":"transparent"}}>
+              <td style={S.tableCell}><MoveBadge type={m.movement}/></td>
+              <td style={S.tableCell}>{m.district_name||"-"}</td>
+              <td style={S.tableCell}>{m.borough_name||"-"}</td>
+              <td style={{...S.tableCell,maxWidth:200,overflow:"hidden",textOverflow:"ellipsis"}}>{m.property_type}</td>
+              <td style={{...S.tableCell,color:"var(--text)"}}>{fmtM(m.price_czk)}</td>
+              <td style={{...S.tableCell,color:m.price_change_amount>0?"var(--green)":m.price_change_amount<0?"var(--red)":"var(--text-3)"}}>
+                {m.price_change_amount!=null?`${m.price_change_amount>0?"+":""}${fmtInt(m.price_change_amount)} Kč`:"-"}
+              </td>
+              <td style={S.tableCell}>{fmtDays(m.listing_duration_days)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>}
+    </div>
+  );
+}
+
+// ─── LISTINGS TABLE ───────────────────────────────────────────────────────────
+const COLS=[
+  {k:"source",l:"Source",fmt:v=>v,w:80},
+  {k:"property_type",l:"Type",fmt:v=>v,w:90},
+  {k:"district_name",l:"District",fmt:v=>v,w:75},
+  {k:"borough_name",l:"Borough",fmt:v=>v,w:85},
+  {k:"layout_type",l:"Layout",fmt:v=>v||"-",w:60},
+  {k:"area_m2",l:"m²",fmt:v=>v?`${v}`:"-",w:55,num:true},
+  {k:"price_czk",l:"Price",fmt:fmtM,w:100,num:true},
+  {k:"price_per_m2_czk",l:"Kč/m²",fmt:v=>v?`${fmtInt(v)}`:"-",w:80,num:true},
+  {k:"seller_type",l:"Seller",fmt:v=>v||"-",w:65},
+  {k:"listing_duration_days",l:"DOM",fmt:fmtDays,w:60,num:true},
+  {k:"location_quality",l:"Loc.Quality",fmt:v=>v,w:95},
+];
+
+function ListingsTable({listings}){
+  const [search,setSearch]=useState("");
+  const [sort,setSort]=useState({k:"price_czk",asc:false});
+  const [page,setPage]=useState(1);
+  const PER=50;
+
+  const filtered=useMemo(()=>{
+    let d=listings.filter(l=>l.is_active);
+    if(search){const q=search.toLowerCase();d=d.filter(l=>(l.title||"").toLowerCase().includes(q)||(l.district_name||"").toLowerCase().includes(q)||(l.borough_name||"").toLowerCase().includes(q));}
+    d=[...d].sort((a,b)=>{const av=a[sort.k]??-Infinity,bv=b[sort.k]??-Infinity;return sort.asc?(av>bv?1:-1):(av<bv?1:-1);});
+    return d;
+  },[listings,search,sort]);
+
+  const pages=Math.ceil(filtered.length/PER);
+  const slice=filtered.slice((page-1)*PER,(page)*PER);
+
+  const doSort=k=>setSort(s=>s.k===k?{k,asc:!s.asc}:{k,asc:false});
+
+  return(
+    <div style={S.card}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+        <div style={S.sectionTitle}>Active Listings</div>
+        <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{color:"var(--text-3)",fontSize:12}}>{filtered.length.toLocaleString()} listings</div>
+          <input style={{width:220,background:"var(--bg-card2)",border:"1px solid var(--border)",color:"var(--text)",borderRadius:8,padding:"6px 10px",fontSize:12}} placeholder="Search title, district, borough…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);}}/>
+        </div>
+      </div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead><tr>
+            {COLS.map(c=><th key={c.k} style={{...S.tableHead,width:c.w,cursor:"pointer"}} onClick={()=>doSort(c.k)}>
+              {c.l}{sort.k===c.k?sort.asc?" ↑":" ↓":""}
+            </th>)}
+          </tr></thead>
+          <tbody>
+            {slice.map((l,i)=>(
+              <tr key={l.composite_id} style={{background:i%2?"var(--bg-card2)":"transparent",transition:"background 0.1s"}}
+                  onMouseEnter={e=>e.currentTarget.style.background="var(--bg-card2)"}
+                  onMouseLeave={e=>e.currentTarget.style.background=i%2?"var(--bg-card2)":"transparent"}>
+                {COLS.map(c=>{
+                  const v=c.fmt(l[c.k]);
+                  const isQuality=c.k==="location_quality";
+                  const style={...S.tableCell,color:isQuality&&v!=="ok"?"var(--yellow)":c.num?"var(--text)":"var(--text-2)",fontSize:12};
+                  return <td key={c.k} style={style}>{v}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pages>1&&<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,marginTop:14}}>
+        <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} style={{background:"var(--blue-dim)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 14px",fontSize:13,opacity:page===1?.4:1}}>← Prev</button>
+        <span style={{color:"var(--text-3)",fontSize:12}}>Page {page} of {pages}</span>
+        <button onClick={()=>setPage(p=>Math.min(pages,p+1))} disabled={page===pages} style={{background:"var(--blue-dim)",color:"var(--blue)",border:"1px solid var(--border)",borderRadius:8,padding:"5px 14px",fontSize:13,opacity:page===pages?.4:1}}>Next →</button>
+      </div>}
+    </div>
+  );
+}
+
+// ─── DATA QUALITY ─────────────────────────────────────────────────────────────
+function DataQuality({quality}){
+  const {total_records=0,active_records=0,missing_price=0,missing_area=0,missing_price_per_sqm=0,missing_coordinates=0,location_issues=0}=quality||{};
+  const pct=n=>total_records?`${((n/total_records)*100).toFixed(1)}%`:"0%";
+  const items=[
+    {l:"Total records",v:fmtInt(total_records),c:"var(--blue)"},
+    {l:"Active listings",v:fmtInt(active_records),c:"var(--green)"},
+    {l:"Missing price",v:`${fmtInt(missing_price)} (${pct(missing_price)})`,c:missing_price>10?"var(--red)":"var(--text-3)"},
+    {l:"Missing area",v:`${fmtInt(missing_area)} (${pct(missing_area)})`,c:missing_area>20?"var(--yellow)":"var(--text-3)"},
+    {l:"No coordinates",v:`${fmtInt(missing_coordinates)} (${pct(missing_coordinates)})`,c:"var(--text-3)"},
+    {l:"Location issues",v:`${fmtInt(location_issues)} (${pct(location_issues)})`,c:location_issues>30?"var(--yellow)":"var(--text-3)"},
+  ];
+  return(
+    <div style={S.card}>
+      <div style={S.sectionTitle}>Data Quality & Coverage</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+        {items.map(item=>(
+          <div key={item.l} style={{background:"var(--bg-card2)",border:"1px solid var(--border)",borderRadius:10,padding:"12px 14px"}}>
+            <div style={{...S.label,marginBottom:4}}>{item.l}</div>
+            <div style={{fontSize:16,fontWeight:700,color:item.c}}>{item.v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── EMPTY / LOADING STATES ───────────────────────────────────────────────────
+function EmptyState({msg}){
+  return <div style={{padding:"32px 20px",textAlign:"center",color:"var(--text-3)",fontSize:13,background:"var(--bg-card2)",borderRadius:12,border:"1px dashed var(--border)"}}>{msg}</div>;
+}
+function LoadingSpinner(){
+  return(
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"60vh",gap:16}}>
+      <div style={{width:40,height:40,border:"3px solid var(--border)",borderTopColor:"var(--blue)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>
+      <div style={{color:"var(--text-3)"}}>Loading market intelligence…</div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+// ─── HEADER ───────────────────────────────────────────────────────────────────
+function Header({overview,loading,onFilterToggle,apiStatus}){
+  const latest=overview?.latest_snapshot_date;
+  const prev=overview?.previous_snapshot_date;
+  return(
+    <div style={{borderBottom:"1px solid var(--border)",padding:"14px 24px",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap",background:"rgba(7,11,20,0.95)",backdropFilter:"blur(8px)",position:"sticky",top:0,zIndex:50}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:28,height:28,background:"var(--blue)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:13}}>P</div>
+        <div>
+          <div style={{fontWeight:800,fontSize:15,letterSpacing:"-0.01em"}}>Prague Real Estate Intelligence</div>
+          <div style={{fontSize:11,color:"var(--text-3)"}}>
+            {latest?`Snapshot ${latest}${prev?` · vs ${prev}`:""}`:"No data loaded"}
+            {apiStatus==="mock"&&<span style={{marginLeft:8,color:"var(--yellow)",fontSize:10}}> · DEMO DATA</span>}
+            {apiStatus==="live"&&<span style={{marginLeft:8,color:"var(--green)",fontSize:10}}> · LIVE API</span>}
+          </div>
+        </div>
+      </div>
+      <div style={{marginLeft:"auto",display:"flex",gap:8,alignItems:"center"}}>
+        {loading&&<div style={{width:16,height:16,border:"2px solid var(--border)",borderTopColor:"var(--blue)",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/>}
+        <button onClick={onFilterToggle} style={{background:"var(--blue-dim)",color:"var(--blue)",border:"1px solid var(--blue)",borderRadius:8,padding:"6px 14px",fontSize:13,fontWeight:600}}>⚙ Filters</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+const API_BASE = window.location.hostname === "localhost" ? "http://localhost:8000" : "";
+
+function App(){
+  const [data,setData]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [apiStatus,setApiStatus]=useState("unknown");
+  const [filters,setFilters]=useState({});
+  const [sidebarOpen,setSidebarOpen]=useState(false);
+  const [filterOptions,setFilterOptions]=useState({});
+
+  // Try to fetch live data from FastAPI; fall back to MOCK
+  useEffect(()=>{
+    let cancelled=false;
+    async function load(){
+      try{
+        const [ovRes,tsRes,diRes,mvRes,lsRes,qRes,foRes]=await Promise.all([
+          fetch(`${API_BASE}/api/market/overview`),
+          fetch(`${API_BASE}/api/market/timeseries`),
+          fetch(`${API_BASE}/api/market/districts`),
+          fetch(`${API_BASE}/api/market/price-movements`),
+          fetch(`${API_BASE}/api/listings?per_page=500`),
+          fetch(`${API_BASE}/api/market/data-quality`),
+          fetch(`${API_BASE}/api/market/filter-options`),
+        ]);
+        if(!ovRes.ok) throw new Error("API error");
+        const [ov,ts,di,mv,ls,q,fo]=await Promise.all([ovRes.json(),tsRes.json(),diRes.json(),mvRes.json(),lsRes.json(),qRes.json(),foRes.json()]);
+        if(!cancelled){
+          setData({overview:ov,timeseries:ts.data||[],districts:di.data||[],movements:mv.data||[],listings:ls.data||[],quality:q});
+          setFilterOptions(fo);
+          setApiStatus("live");
+        }
+      }catch(e){
+        if(!cancelled){
+          // Build filter options from mock
+          const active=MOCK.listings.filter(l=>l.is_active);
+          setFilterOptions({
+            sources:[...new Set(active.map(l=>l.source))].sort(),
+            property_types:[...new Set(active.map(l=>l.property_type))].sort(),
+            districts:[...new Set(active.map(l=>l.district_name))].sort(),
+            boroughs:[...new Set(active.map(l=>l.borough_name))].sort(),
+            seller_types:[...new Set(active.map(l=>l.seller_type))].sort(),
+          });
+          setData(MOCK);
+          setApiStatus("mock");
+        }
+      }finally{if(!cancelled)setLoading(false);}
+    }
+    load();
+    return()=>{cancelled=true;};
+  },[]);
+
+  // Apply filters to the data client-side
+  const filteredData=useMemo(()=>{
+    if(!data) return null;
+    let listings=data.listings.filter(l=>l.is_active);
+    if(filters.sources?.length) listings=listings.filter(l=>filters.sources.includes(l.source));
+    if(filters.property_types?.length) listings=listings.filter(l=>filters.property_types.includes(l.property_type));
+    if(filters.districts?.length) listings=listings.filter(l=>filters.districts.includes(l.district_name));
+    if(filters.boroughs?.length) listings=listings.filter(l=>filters.boroughs.includes(l.borough_name));
+    if(filters.seller_types?.length) listings=listings.filter(l=>filters.seller_types.includes(l.seller_type));
+    if(filters.price_min!=null) listings=listings.filter(l=>(l.price_czk||0)>=filters.price_min);
+    if(filters.price_max!=null) listings=listings.filter(l=>(l.price_czk||0)<=filters.price_max);
+    if(filters.size_min!=null) listings=listings.filter(l=>(l.area_m2||0)>=filters.size_min);
+    if(filters.size_max!=null) listings=listings.filter(l=>(l.area_m2||0)<=filters.size_max);
+    return {...data,listings:[...listings,...data.listings.filter(l=>!l.is_active)]};
+  },[data,filters]);
+
+  if(loading) return <LoadingSpinner/>;
+  if(!filteredData) return <EmptyState msg="No data available. Run run_pipeline.py first, then start the API with: uvicorn src.api.main:app --reload"/>;
+
+  const {overview,timeseries,districts,movements,listings,quality}=filteredData;
+
+  return(
+    <div style={{minHeight:"100vh",background:"var(--bg)"}}>
+      <FilterSidebar filters={filters} onChange={setFilters} options={filterOptions} open={sidebarOpen} onClose={()=>setSidebarOpen(false)}/>
+      {sidebarOpen&&<div onClick={()=>setSidebarOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:90}}/>}
+
+      <Header overview={overview} loading={loading} onFilterToggle={()=>setSidebarOpen(s=>!s)} apiStatus={apiStatus}/>
+
+      <div style={{padding:"20px 24px",maxWidth:1600,margin:"0 auto",display:"flex",flexDirection:"column",gap:20}}>
+
+        {/* Hero */}
+        <div style={{background:"linear-gradient(135deg,rgba(20,35,75,0.9),rgba(8,13,26,0.97))",border:"1px solid rgba(107,143,255,0.22)",borderRadius:20,padding:"22px 26px"}}>
+          <div style={{fontSize:11,color:"var(--blue)",textTransform:"uppercase",letterSpacing:"0.12em",fontWeight:700,marginBottom:6}}>Prague Market Intelligence</div>
+          <div style={{fontSize:22,fontWeight:800,marginBottom:6}}>Daily listing intelligence for analysts, investors &amp; real-estate operators</div>
+          <div style={{color:"var(--text-2)",fontSize:13,maxWidth:760}}>
+            Tracks active inventory, pricing, removals, and district-level movement using daily scrape snapshots.
+            {apiStatus==="mock"&&" Running on embedded demo data — connect the FastAPI backend for live figures."}
+            Comparing <strong style={{color:"var(--text)"}}>{overview.latest_snapshot_date}</strong> vs previous snapshot <strong style={{color:"var(--text)"}}>{overview.previous_snapshot_date}</strong>.
+          </div>
+        </div>
+
+        {/* KPI Row 1 */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+          <KpiCard label="Active Listings" metric={overview.active_listings} mainFmt={fmtInt}/>
+          <KpiCard label="Total Market Value" metric={overview.total_market_value} mainFmt={fmtB}/>
+          <KpiCard label="Median Listing Price" metric={overview.median_listing_price} mainFmt={fmtM}/>
+          <KpiCard label="Average Listing Price" metric={overview.average_listing_price} mainFmt={fmtM}/>
+        </div>
+
+        {/* KPI Row 2 */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+          <KpiCard label="Median Price / m²" metric={overview.median_price_per_sqm} mainFmt={v=>v?`${fmtInt(v)} Kč/m²`:"n/a"} compact/>
+          <SimpleKpi label="New Listings Today" value={overview.new_listings} fmt={v=>`+${v}`} color="var(--green)"/>
+          <SimpleKpi label="Removed Listings" value={overview.removed_listings} fmt={v=>`-${v}`} color="var(--red)"/>
+          <SimpleKpi label="Median Days on Market" value={overview.days_on_market_median} fmt={fmtDays} color="var(--yellow)"/>
+        </div>
+
+        {/* Price movement summary */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14}}>
+          <SimpleKpi label="Price Reductions" value={overview.price_reductions} fmt={v=>`${v} listings`} color="var(--yellow)"/>
+          <SimpleKpi label="Price Increases" value={overview.price_increases} fmt={v=>`${v} listings`} color="var(--blue)"/>
+          <SimpleKpi label="Avg Days on Market" value={overview.days_on_market_avg} fmt={fmtDays} color="var(--purple)"/>
+          <SimpleKpi label="Location Issues" value={quality?.location_issues} fmt={v=>`${v} flagged`} color="var(--text-3)"/>
+        </div>
+
+        {/* Trend charts */}
+        <SectionHeader title="Market Trends"/>
+        <TrendCharts timeseries={timeseries}/>
+
+        {/* District analysis */}
+        <SectionHeader title="District Analysis"/>
+        <DistrictSection districts={districts}/>
+
+        {/* Movements */}
+        <SectionHeader title="Market Movements"/>
+        <MovementsSection movements={movements}/>
+
+        {/* Distribution charts */}
+        <SectionHeader title="Price & Duration Distribution"/>
+        <DistributionCharts listings={listings}/>
+
+        {/* Listings table */}
+        <SectionHeader title="Active Listings"/>
+        <ListingsTable listings={listings}/>
+
+        {/* Data quality */}
+        <SectionHeader title="Data Quality"/>
+        <DataQuality quality={quality}/>
+
+        <div style={{color:"var(--text-3)",fontSize:11,textAlign:"center",padding:"8px 0 24px"}}>
+          Prague Real Estate Intelligence · Data sourced from Sreality &amp; Bezrealitky · {new Date().toLocaleDateString("en-GB",{year:"numeric",month:"long",day:"numeric"})}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({title}){
+  return <div style={{fontSize:13,fontWeight:700,color:"var(--text-2)",textTransform:"uppercase",letterSpacing:"0.08em",borderBottom:"1px solid var(--border)",paddingBottom:8}}>{title}</div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

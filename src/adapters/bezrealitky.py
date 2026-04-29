@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from src.config import CONFIG
 from src.utils.helpers import clean_text, safe_float, json_dumps_safe
+from src.utils.process_csv import looks_like_listing_title
 from src.utils.logger import get_logger
 
 logger = get_logger("bezrealitky")
@@ -77,7 +78,7 @@ class BezrealitkyAdapter:
             href_l = href.lower()
             if "bezrealitky.cz" not in full_url.lower():
                 continue
-            if not any(x in href_l for x in ["/nemovitosti-byty-domy/", "/nabidka-prodej/", "/detail/"]):
+            if not re.search(r"/(nemovitosti-byty-domy|detail)/\d+", href_l):
                 continue
             url_id = self.extract_url_id(full_url)
             composite_id = f"{self.source_name}_{property_search_type}_{url_id}"
@@ -85,7 +86,7 @@ class BezrealitkyAdapter:
                 continue
             seen.add(composite_id)
             title = clean_text(a.get_text(" ", strip=True))
-            if not title or len(title) < 8:
+            if not looks_like_listing_title(title):
                 continue
             rows.append({
                 "composite_id": composite_id,

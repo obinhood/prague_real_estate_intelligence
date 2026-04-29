@@ -13,6 +13,54 @@ from src.utils.state import reconcile_current_with_previous, build_history_snaps
 logger = get_logger("pipeline")
 
 
+def enrich_district_medians(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add ``price_vs_district_median_pct`` to *df*.
+
+    For each active listing we compute how far its ``price_per_m2_czk`` sits
+    relative to the district-level median price-per-m².  Removed listings and
+    rows without a valid price or district are left as ``None``.
+
+    Formula: ((listing_price_per_m2 / district_median_price_per_m2) - 1) * 100
+      > 0  → listing is above district median (more expensive per m²)
+      < 0  → listing is below district median (cheaper per m²)
+    """
+    if df.empty:
+        df["price_vs_district_median_pct"] = None
+        return df
+
+    out = df.copy()
+    out["price_vs_district_median_pct"] = None
+
+    # Only compute for active listings with numeric data
+    mask = (
+        (out.get("is_active", pd.Series(True, index=out.index)) == True) &
+        out["price_per_m2_czk"].notna() &
+        out["district_name"].notna() &
+        (out["district_name"] != "Praha - Ostatní")
+    )
+    active = out.loc[mask].copy()
+    if active.empty:
+        return out
+
+    medians = (
+        active.groupby("district_name")["price_per_m2_czk"]
+        .median()
+        .rename("district_median_ppm2")
+    )
+    active = active.join(medians, on="district_name")
+    active["price_vs_district_median_pct"] = (
+        (active["price_per_m2_czk"] / active["district_median_ppm2"] - 1) * 100
+    ).round(2)
+
+    out.loc[mask, "price_vs_district_median_pct"] = active["price_vs_district_median_pct"].values
+    logger.info(
+        f"STAGE: District median enrichment complete | "
+        f"districts: {len(medians)} | enriched rows: {mask.sum()}"
+    )
+    return out
+
+
 def collect_from_sources(include_bezrealitky=False):
     logger.info("STAGE: Source collection started")
     rows = []
@@ -54,12 +102,18 @@ def run_pipeline(include_bezrealitky=False):
     previous_history = read_table_df("listing_history")
     logger.info("STAGE: Reconciling current state with previous state")
     current_state, summary = reconcile_current_with_previous(processed_df, previous_state, now)
+    logger.info("STAGE: Enriching with cross-listing district median fields")
+    current_state = enrich_district_medians(current_state)
     logger.info("STAGE: Building history snapshot")
     history_snapshot = build_history_snapshot(processed_df, previous_state, now)
     logger.info("STAGE: Persisting current state to database")
     write_dataframe_replace(current_state, "listings")
     logger.info("STAGE: Persisting history to database")
     full_history = pd.concat([previous_history, history_snapshot], ignore_index=True) if not previous_history.empty else history_snapshot.copy()
+    # Deduplicate so repeated same-day runs don't accumulate duplicate history rows
+    full_history = full_history.drop_duplicates(
+        subset=["composite_id", "scraped_at", "exists_on_source"], keep="last"
+    ).reset_index(drop=True)
     write_dataframe_replace(full_history, "listing_history")
     logger.info("STAGE: Writing CSV mirrors")
     current_state.to_csv(processed_csv, index=False)

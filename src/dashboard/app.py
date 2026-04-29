@@ -1,204 +1,396 @@
+import math
 import os
+from datetime import timedelta
+
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+
+from src.analytics.service import (
+    get_active_listings,
+    get_data_quality,
+    get_listing_history,
+    get_market_districts,
+    get_market_overview,
+    get_market_price_movements,
+    get_market_timeseries,
+    load_market_data,
+)
+
 
 st.set_page_config(page_title="Prague Real Estate Intelligence", layout="wide")
 
 st.markdown(
     """
     <style>
-    .stApp { background: #0c1326; color: #edf3ff; }
-    .block-container { max-width: 1600px; padding-top: 1rem; padding-bottom: 2rem; }
-    h1, h2, h3, label, .stMarkdown, .stCaption, p { color: #edf3ff !important; }
-    [data-testid="stMetric"] {
-        background: #111a31;
-        border: 1px solid #24365f;
-        padding: 14px 18px;
-        border-radius: 18px;
-        box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+    .stApp { background: radial-gradient(circle at top left, #1a2440 0%, #0a0f1d 48%, #070b14 100%); color: #edf2ff; }
+    .block-container { max-width: 1600px; padding-top: 1.2rem; padding-bottom: 2rem; }
+    h1, h2, h3, label, .stMarkdown, .stCaption, p, span { color: #edf2ff !important; }
+    [data-testid="stSidebar"] { background: rgba(9, 14, 27, 0.98); border-right: 1px solid rgba(116, 148, 255, 0.18); }
+    [data-testid="stMetric"], .panel {
+        background: linear-gradient(180deg, rgba(17,25,46,0.96) 0%, rgba(10,16,32,0.96) 100%);
+        border: 1px solid rgba(101,130,215,0.20);
+        border-radius: 20px;
+        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+        padding: 16px 18px;
     }
-    [data-testid="stMetricValue"] { color: #7fe5c0; }
-    [data-testid="stSidebar"] { background: #0a1020; border-right: 1px solid #24365f; }
+    .hero {
+        background: linear-gradient(135deg, rgba(30,48,92,0.92), rgba(11,16,30,0.96));
+        border: 1px solid rgba(122,157,255,0.24);
+        border-radius: 24px;
+        padding: 24px 26px;
+        margin-bottom: 18px;
+    }
+    .hero-kicker { color: #88b6ff !important; letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.76rem; }
+    .hero-title { font-size: 2rem; font-weight: 700; margin: 0.3rem 0 0.6rem 0; }
+    .hero-copy { color: #a8b6d9 !important; max-width: 880px; }
+    .kpi-card {
+        background: linear-gradient(180deg, rgba(17,25,46,0.98) 0%, rgba(8,12,22,0.98) 100%);
+        border: 1px solid rgba(103,134,212,0.2);
+        border-radius: 22px;
+        padding: 18px;
+        min-height: 148px;
+    }
+    .kpi-label { color: #8ea4d6 !important; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; }
+    .kpi-value { font-size: 1.8rem; font-weight: 700; margin-top: 0.45rem; }
+    .kpi-delta { font-size: 0.95rem; margin-top: 0.55rem; }
+    .kpi-subtle { color: #8fa1c9 !important; font-size: 0.85rem; margin-top: 0.55rem; }
+    .delta-up { color: #6ee7b7 !important; }
+    .delta-down { color: #ff8f8f !important; }
+    .delta-flat { color: #f7d47c !important; }
+    .section-title { margin-top: 1.6rem; margin-bottom: 0.7rem; }
+    .small-note { color: #92a3cb !important; }
+    .dataframe tbody tr:hover { background: rgba(114, 143, 255, 0.08); }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.title("Prague Real Estate Intelligence")
-st.caption("Professional dashboard for Prague real estate market movement by scrape date, district, property type and source.")
+
+def fmt_int(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{int(round(value)):,}".replace(",", " ")
+
+
+def fmt_czk(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{int(round(value)):,} Kč".replace(",", " ")
+
+
+def fmt_days(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{float(value):.1f} d"
+
+
+def fmt_pct(value):
+    if value is None or pd.isna(value):
+        return "n/a"
+    sign = "+" if value > 0 else ""
+    return f"{sign}{value:.2f}%"
+
+
+def render_kpi_card(title, metric, formatter, subtitle=None):
+    current_value = metric.get("current") if isinstance(metric, dict) else metric
+    delta_value = metric.get("delta") if isinstance(metric, dict) else None
+    pct_value = metric.get("pct_change") if isinstance(metric, dict) else None
+    arrow = "→"
+    delta_class = "delta-flat"
+    if delta_value is not None and not pd.isna(delta_value):
+        if delta_value > 0:
+            arrow = "↑"
+            delta_class = "delta-up"
+        elif delta_value < 0:
+            arrow = "↓"
+            delta_class = "delta-down"
+    delta_text = "No comparison snapshot"
+    if delta_value is not None and not pd.isna(delta_value):
+        delta_text = f"{arrow} {formatter(delta_value)}"
+        if pct_value is not None and not pd.isna(pct_value):
+            delta_text = f"{delta_text} ({fmt_pct(pct_value)})"
+    subtitle_text = subtitle or ""
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{title}</div>
+            <div class="kpi-value">{formatter(current_value)}</div>
+            <div class="kpi-delta {delta_class}">{delta_text}</div>
+            <div class="kpi-subtle">{subtitle_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def empty_panel(message):
+    st.markdown(f"<div class='panel small-note'>{message}</div>", unsafe_allow_html=True)
+
 
 data_path = "data/listings_processed.csv"
-history_path = "data/listing_history.csv"
-removed_path = "data/removed_listings.csv"
-
 if not os.path.exists(data_path):
     st.warning("No processed dataset found. Run `python run_pipeline.py` first.")
     st.stop()
 
-df = pd.read_csv(data_path)
-history_df = pd.read_csv(history_path) if os.path.exists(history_path) else pd.DataFrame()
-removed_df = pd.read_csv(removed_path) if os.path.exists(removed_path) else pd.DataFrame()
+with st.spinner("Loading market intelligence datasets..."):
+    bundle = load_market_data()
 
-for frame in [df, history_df, removed_df]:
-    for col in ["price_czk", "price_per_m2_czk", "area_m2", "listing_duration_days", "removed_duration_days"]:
-        if col in frame.columns:
-            frame[col] = pd.to_numeric(frame[col], errors="coerce")
+if bundle.current_df.empty:
+    st.warning("The processed dataset is empty. Run the pipeline again after scraping completes.")
+    st.stop()
 
-for col in ["first_seen_at", "last_seen_at", "removed_at"]:
-    if col in df.columns:
-        df[col] = pd.to_datetime(df[col], errors="coerce")
-
-if not history_df.empty and "scraped_at" in history_df.columns:
-    history_df["scraped_at"] = pd.to_datetime(history_df["scraped_at"], errors="coerce")
-
-active_df = df[df["is_active"] == True].copy() if "is_active" in df.columns else df.copy()
+history_dates = sorted(date for date in bundle.history_df.get("snapshot_date", pd.Series(dtype="object")).dropna().unique().tolist())
+default_start = history_dates[0] if history_dates else None
+default_end = history_dates[-1] if history_dates else None
+active_df = bundle.current_df[bundle.current_df["is_active"] == True].copy() if "is_active" in bundle.current_df.columns else bundle.current_df.copy()
 
 with st.sidebar:
     st.header("Filters")
-    source_options = sorted([x for x in active_df.get("source", pd.Series(dtype=str)).dropna().unique().tolist() if str(x).strip()])
-    selected_sources = st.multiselect("Website", source_options, default=source_options)
-    property_options = sorted([x for x in active_df.get("property_type", pd.Series(dtype=str)).dropna().unique().tolist() if str(x).strip()])
+    date_range = None
+    if history_dates:
+        chosen_dates = st.date_input(
+            "Snapshot range",
+            value=(default_start, default_end) if default_start and default_end and default_start != default_end else default_end,
+            min_value=default_start,
+            max_value=default_end,
+        )
+        if isinstance(chosen_dates, tuple):
+            date_range = chosen_dates
+        else:
+            date_range = (chosen_dates - timedelta(days=30), chosen_dates)
+
+    source_options = sorted([value for value in active_df.get("source", pd.Series(dtype=str)).dropna().unique().tolist() if str(value).strip()])
+    property_options = sorted([value for value in active_df.get("property_type", pd.Series(dtype=str)).dropna().unique().tolist() if str(value).strip()])
+    district_options = sorted([value for value in active_df.get("district_name", pd.Series(dtype=str)).dropna().unique().tolist() if str(value).strip()])
+    borough_options = sorted([value for value in active_df.get("borough_name", pd.Series(dtype=str)).dropna().unique().tolist() if str(value).strip()])
+    seller_options = sorted([value for value in active_df.get("seller_type", pd.Series(dtype=str)).dropna().unique().tolist() if str(value).strip()])
+
+    selected_sources = st.multiselect("Source", source_options, default=source_options)
     selected_property_types = st.multiselect("Property type", property_options, default=property_options)
-    district_options = sorted([x for x in active_df.get("district_name", pd.Series(dtype=str)).dropna().unique().tolist() if str(x).strip()])
     selected_districts = st.multiselect("District", district_options, default=district_options)
+    selected_boroughs = st.multiselect("Borough", borough_options, default=borough_options)
+    selected_sellers = st.multiselect("Seller type", seller_options, default=seller_options)
+    search_term = st.text_input("Search listing title or address")
 
-filtered = active_df.copy()
-if selected_sources and "source" in filtered.columns:
-    filtered = filtered[filtered["source"].isin(selected_sources)]
-if selected_property_types and "property_type" in filtered.columns:
-    filtered = filtered[filtered["property_type"].isin(selected_property_types)]
-if selected_districts and "district_name" in filtered.columns:
-    filtered = filtered[filtered["district_name"].isin(selected_districts)]
+    price_values = active_df["price_czk"].dropna() if "price_czk" in active_df.columns else pd.Series(dtype=float)
+    size_values = active_df["area_m2"].dropna() if "area_m2" in active_df.columns else pd.Series(dtype=float)
+    price_min = int(price_values.min()) if not price_values.empty else 0
+    price_max = int(price_values.max()) if not price_values.empty else 0
+    size_min = int(size_values.min()) if not size_values.empty else 0
+    size_max = int(size_values.max()) if not size_values.empty else 0
 
-if filtered.empty:
-    st.warning("No listings match the selected filters.")
+    selected_price_range = (price_min, price_max)
+    selected_size_range = (size_min, size_max)
+    if price_max > price_min:
+        selected_price_range = st.slider("Price range (CZK)", min_value=price_min, max_value=price_max, value=(price_min, price_max), step=max(100000, (price_max - price_min) // 100))
+    if size_max > size_min:
+        selected_size_range = st.slider("Size range (m²)", min_value=size_min, max_value=size_max, value=(size_min, size_max))
+
+filters = {
+    "date_range": date_range,
+    "sources": selected_sources,
+    "property_types": selected_property_types,
+    "districts": selected_districts,
+    "boroughs": selected_boroughs,
+    "seller_types": selected_sellers,
+    "search": search_term,
+    "price_range": selected_price_range,
+    "size_range": selected_size_range,
+}
+
+overview = get_market_overview(bundle, filters)
+timeseries = get_market_timeseries(bundle, filters)
+districts_df = get_market_districts(bundle, filters)
+movements_df = get_market_price_movements(bundle, filters)
+active_listings_df = get_active_listings(bundle, filters)
+quality = get_data_quality(bundle, filters)
+
+if active_listings_df.empty:
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-kicker">Prague Market Intelligence</div>
+            <div class="hero-title">No listings match the current filter set</div>
+            <div class="hero-copy">Widen the district, source, or price filters to bring listings back into scope. Time-series history remains filter-aware and compares against the previous available snapshot inside the chosen window.</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.stop()
 
-hist_filtered = history_df.copy()
-if not hist_filtered.empty:
-    if selected_sources and "source" in hist_filtered.columns:
-        hist_filtered = hist_filtered[hist_filtered["source"].isin(selected_sources)]
-    if selected_property_types and "property_type" in hist_filtered.columns:
-        hist_filtered = hist_filtered[hist_filtered["property_type"].isin(selected_property_types)]
-    if selected_districts and "district_name" in hist_filtered.columns:
-        hist_filtered = hist_filtered[hist_filtered["district_name"].isin(selected_districts)]
+latest_date = overview.get("latest_snapshot_date")
+previous_date = overview.get("previous_snapshot_date")
+comparison_text = "Latest available snapshot"
+if latest_date and previous_date:
+    comparison_text = f"Comparing {latest_date} vs previous available snapshot {previous_date}"
+elif latest_date:
+    comparison_text = f"Only one snapshot available in the current filtered range: {latest_date}"
 
+st.markdown(
+    f"""
+    <div class="hero">
+        <div class="hero-kicker">Prague Market Intelligence</div>
+        <div class="hero-title">Daily listing intelligence for analysts, investors, and real-estate operators</div>
+        <div class="hero-copy">
+            Tracks active inventory, pricing, removals, and district-level movement using scrape snapshots. {comparison_text}.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-def fmt_czk(x):
-    if x is None or pd.isna(x):
-        return "n/a"
-    return f"{int(round(x)):,.0f} Kč".replace(",", " ")
+kpi_row_1 = st.columns(4)
+with kpi_row_1[0]:
+    render_kpi_card("Active Listings", overview["active_listings"], fmt_int, "Current active inventory in filtered scope")
+with kpi_row_1[1]:
+    render_kpi_card("Total Market Value", overview["total_market_value"], fmt_czk, "Aggregate asking value of current active listings")
+with kpi_row_1[2]:
+    render_kpi_card("Median Listing Price", overview["median_listing_price"], fmt_czk, "Median asking price across current active listings")
+with kpi_row_1[3]:
+    render_kpi_card("Average Listing Price", overview["average_listing_price"], fmt_czk, "Average asking price across current active listings")
 
+kpi_row_2 = st.columns(4)
+with kpi_row_2[0]:
+    render_kpi_card("Median Price / m²", overview["median_price_per_sqm"], fmt_czk, "Median price efficiency for listings with area data")
+with kpi_row_2[1]:
+    render_kpi_card("New Listings", {"current": overview["new_listings"], "delta": None, "pct_change": None}, fmt_int, "IDs present now but not in previous snapshot")
+with kpi_row_2[2]:
+    render_kpi_card("Removed Listings", {"current": overview["removed_listings"], "delta": None, "pct_change": None}, fmt_int, "IDs missing now but present in previous snapshot")
+with kpi_row_2[3]:
+    render_kpi_card("Median Days on Market", {"current": overview["days_on_market_median"], "delta": None, "pct_change": None}, fmt_days, "Median duration of still-active filtered listings")
 
-def fmt_days(x):
-    if x is None or pd.isna(x):
-        return "n/a"
-    return f"{round(float(x),1)} days"
+st.markdown("<h2 class='section-title'>Market Overview</h2>", unsafe_allow_html=True)
+trend_left, trend_right = st.columns(2)
 
-
-def delta_str(curr, prev, mode="currency"):
-    if prev is None or pd.isna(prev):
-        return "n/a"
-    diff = curr - prev
-    if mode == "currency":
-        return fmt_czk(diff)
-    if mode == "count":
-        return f"{int(diff):,}"
-    return f"{round(float(diff),1)}"
-
-listing_count_curr = len(filtered)
-listing_count_prev = None
-total_market_curr = filtered["price_czk"].sum() if "price_czk" in filtered.columns else None
-avg_price_curr = filtered["price_czk"].mean() if "price_czk" in filtered.columns else None
-avg_duration_curr = filtered["listing_duration_days"].mean() if "listing_duration_days" in filtered.columns else None
-
-total_market_prev = None
-avg_price_prev = None
-if not hist_filtered.empty and "scraped_at" in hist_filtered.columns:
-    scrape_dates = sorted(hist_filtered["scraped_at"].dropna().unique().tolist())
-    if len(scrape_dates) >= 2:
-        prev_scrape = scrape_dates[-2]
-        prev_df = hist_filtered[(hist_filtered["scraped_at"] == prev_scrape) & (hist_filtered["exists_on_source"] == True)].copy()
-        listing_count_prev = len(prev_df)
-        total_market_prev = prev_df["price_czk"].sum() if "price_czk" in prev_df.columns else None
-        avg_price_prev = prev_df["price_czk"].mean() if "price_czk" in prev_df.columns else None
-
-avg_removed_duration = removed_df["removed_duration_days"].mean() if (not removed_df.empty and "removed_duration_days" in removed_df.columns) else None
-
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Latest active listings", f"{listing_count_curr:,}", delta_str(listing_count_curr, listing_count_prev, "count"))
-m2.metric("Total market value", fmt_czk(total_market_curr), delta_str(total_market_curr, total_market_prev, "currency"))
-m3.metric("Average asking price", fmt_czk(avg_price_curr), delta_str(avg_price_curr, avg_price_prev, "currency"))
-m4.metric("Average listing duration", fmt_days(avg_duration_curr), fmt_days(avg_removed_duration) if avg_removed_duration is not None else "n/a")
-
-st.caption("The first three KPI deltas compare the latest scrape to the previous scrape. The final KPI subtitle shows average duration before removal for removed listings.")
-
-left, right = st.columns(2)
-
-with left:
-    if {"district_name", "price_czk"}.issubset(filtered.columns):
-        district_value = (
-            filtered.dropna(subset=["district_name", "price_czk"])
-            .groupby("district_name", as_index=False)
-            .agg(listing_count=("composite_id", "count"), total_market_value_czk=("price_czk", "sum"), average_asking_price_czk=("price_czk", "mean"))
-            .sort_values("total_market_value_czk", ascending=False)
+if not timeseries.empty:
+    with trend_left:
+        fig_active = px.line(
+            timeseries,
+            x="snapshot_date",
+            y=["active_listings", "new_listings", "removed_listings"],
+            markers=True,
+            title="Inventory and churn by snapshot",
+            color_discrete_sequence=["#7da0ff", "#6ee7b7", "#ff8f8f"],
         )
-        fig1 = px.bar(district_value.head(20), x="district_name", y="total_market_value_czk", title="Total market value by district", hover_data=["listing_count", "average_asking_price_czk"])
-        fig1.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig1, use_container_width=True)
+        fig_active.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", legend_title_text="")
+        st.plotly_chart(fig_active, use_container_width=True)
 
-    if {"property_type", "price_czk"}.issubset(filtered.columns):
-        type_value = (
-            filtered.groupby("property_type", as_index=False)
-            .agg(listing_count=("composite_id", "count"), total_market_value_czk=("price_czk", "sum"), average_asking_price_czk=("price_czk", "mean"))
-            .sort_values("total_market_value_czk", ascending=False)
+    with trend_right:
+        fig_value = go.Figure()
+        fig_value.add_trace(go.Scatter(x=timeseries["snapshot_date"], y=timeseries["total_market_value_czk"], mode="lines+markers", name="Total market value", line=dict(color="#7da0ff", width=3)))
+        fig_value.add_trace(go.Scatter(x=timeseries["snapshot_date"], y=timeseries["median_price_czk"], mode="lines+markers", name="Median price", line=dict(color="#f7d47c", width=2)))
+        fig_value.update_layout(title="Value and price trend", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_value, use_container_width=True)
+else:
+    with trend_left:
+        empty_panel("No multi-snapshot time-series is available yet. Run the pipeline on more than one day to unlock daily trend charts.")
+    with trend_right:
+        empty_panel("Price and value trend charts will appear once at least two snapshots exist in history.")
+
+st.markdown("<h2 class='section-title'>District Analysis</h2>", unsafe_allow_html=True)
+district_left, district_right = st.columns(2)
+if not districts_df.empty:
+    with district_left:
+        fig_district_value = px.bar(
+            districts_df.head(15),
+            x="district_name",
+            y="total_market_value_czk",
+            color="active_listings",
+            title="Top districts by current market value",
+            hover_data=["borough_name", "median_price_czk", "median_price_per_m2_czk", "active_listings_delta"],
+            color_continuous_scale=["#0ea5e9", "#7da0ff", "#8b5cf6"],
         )
-        fig2 = px.bar(type_value, x="property_type", y="listing_count", title="Listing count by property type", hover_data=["total_market_value_czk", "average_asking_price_czk"])
-        fig2.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig2, use_container_width=True)
+        fig_district_value.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_district_value, use_container_width=True)
 
-with right:
-    if {"source", "price_czk"}.issubset(filtered.columns):
-        source_value = filtered.groupby("source", as_index=False).agg(listing_count=("composite_id", "count"), total_market_value_czk=("price_czk", "sum"))
-        fig3 = px.pie(source_value, names="source", values="listing_count", title="Listing share by website", hole=0.45)
-        fig3.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig3, use_container_width=True)
-
-    if {"district_name", "price_per_m2_czk"}.issubset(filtered.columns):
-        district_ppm = (
-            filtered.dropna(subset=["district_name", "price_per_m2_czk"])
-            .groupby("district_name", as_index=False)
-            .agg(median_price_per_m2_czk=("price_per_m2_czk", "median"), listing_count=("composite_id", "count"))
-            .sort_values("median_price_per_m2_czk", ascending=False)
+    with district_right:
+        fig_district_psm = px.bar(
+            districts_df.dropna(subset=["median_price_per_m2_czk"]).head(15),
+            x="district_name",
+            y="median_price_per_m2_czk",
+            color="average_days_on_market",
+            title="Median price per m² by district",
+            hover_data=["borough_name", "active_listings", "active_listings_delta"],
+            color_continuous_scale=["#14532d", "#22c55e", "#86efac"],
         )
-        fig4 = px.bar(district_ppm.head(20), x="district_name", y="median_price_per_m2_czk", title="Median price per m² by district", hover_data=["listing_count"])
-        fig4.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig4, use_container_width=True)
+        fig_district_psm.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_district_psm, use_container_width=True)
+else:
+    with district_left:
+        empty_panel("District analytics are unavailable for the current filter set.")
+    with district_right:
+        empty_panel("Borough and district breakdowns need at least one active listing in scope.")
 
-st.subheader("Scrape-to-scrape trend")
-if not hist_filtered.empty and {"scraped_at", "source", "property_type", "price_czk"}.issubset(hist_filtered.columns):
-    trend = (
-        hist_filtered[hist_filtered["exists_on_source"] == True]
-        .groupby(["scraped_at", "source", "property_type"], as_index=False)
-        .agg(listing_count=("composite_id", "count"), total_market_value_czk=("price_czk", "sum"), average_asking_price_czk=("price_czk", "mean"))
-        .sort_values("scraped_at")
-    )
-    t1, t2 = st.columns(2)
-    with t1:
-        fig5 = px.line(trend, x="scraped_at", y="listing_count", color="property_type", line_dash="source", markers=True, title="Listing count trend by scrape")
-        fig5.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig5, use_container_width=True)
-    with t2:
-        fig6 = px.line(trend, x="scraped_at", y="average_asking_price_czk", color="property_type", line_dash="source", markers=True, title="Average asking price trend by scrape")
-        fig6.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig6, use_container_width=True)
+st.markdown("<h2 class='section-title'>Price and Duration Distribution</h2>", unsafe_allow_html=True)
+distribution_left, distribution_right = st.columns(2)
+with distribution_left:
+    if "price_czk" in active_listings_df.columns and active_listings_df["price_czk"].dropna().any():
+        fig_hist_price = px.histogram(active_listings_df.dropna(subset=["price_czk"]), x="price_czk", nbins=30, title="Asking price distribution", color_discrete_sequence=["#7da0ff"])
+        fig_hist_price.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_hist_price, use_container_width=True)
+    else:
+        empty_panel("Price distribution needs valid `price_czk` data.")
+with distribution_right:
+    if "listing_duration_days" in active_listings_df.columns and active_listings_df["listing_duration_days"].dropna().any():
+        fig_hist_days = px.histogram(active_listings_df.dropna(subset=["listing_duration_days"]), x="listing_duration_days", nbins=30, title="Days on market distribution", color_discrete_sequence=["#f7d47c"])
+        fig_hist_days.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_hist_days, use_container_width=True)
+    else:
+        empty_panel("Days-on-market distribution needs valid duration data.")
 
-st.subheader("Current listings table")
-show_cols = [c for c in ["source", "property_type", "property_link", "title", "district_name", "prague_zone", "layout_type", "area_m2", "price_czk", "price_per_m2_czk", "seller_type", "energy_class", "listing_duration_days"] if c in filtered.columns]
-st.dataframe(filtered[show_cols], use_container_width=True)
+st.markdown("<h2 class='section-title'>Market Movements</h2>", unsafe_allow_html=True)
+if not movements_df.empty:
+    movement_counts = movements_df["movement"].value_counts().rename_axis("movement").reset_index(name="count")
+    fig_movement = px.bar(movement_counts, x="movement", y="count", color="movement", title="Listing movement since previous available snapshot", color_discrete_map={
+        "new": "#6ee7b7",
+        "removed": "#ff8f8f",
+        "price_increase": "#7da0ff",
+        "price_reduction": "#f7d47c",
+    })
+    fig_movement.update_layout(showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_movement, use_container_width=True)
+    st.dataframe(movements_df, use_container_width=True, hide_index=True)
+else:
+    empty_panel("No new, removed, or price-changed listings were detected between the latest and previous available snapshots in the current filter scope.")
 
-if not removed_df.empty:
-    st.subheader("Removed listings")
-    removed_show_cols = [c for c in ["source", "property_type", "property_link", "title", "district_name", "prague_zone", "price_czk", "first_seen_at", "removed_at", "removed_duration_days"] if c in removed_df.columns]
-    st.dataframe(removed_df[removed_show_cols], use_container_width=True)
+st.markdown("<h2 class='section-title'>Active Listings</h2>", unsafe_allow_html=True)
+rows_per_page = st.selectbox("Rows per page", [25, 50, 100], index=1)
+total_rows = len(active_listings_df)
+page_count = max(1, math.ceil(total_rows / rows_per_page))
+page_number = st.number_input("Page", min_value=1, max_value=page_count, value=1, step=1)
+start = (page_number - 1) * rows_per_page
+end = start + rows_per_page
+
+listing_columns = [
+    column for column in [
+        "source", "property_type", "district_name", "borough_name", "title", "price_czk", "price_per_m2_czk",
+        "area_m2", "seller_type", "listing_duration_days", "first_seen_at", "property_link", "location_quality"
+    ] if column in active_listings_df.columns
+]
+st.caption(f"Showing rows {start + 1}-{min(end, total_rows)} of {total_rows}")
+st.dataframe(active_listings_df.iloc[start:end][listing_columns], use_container_width=True, hide_index=True)
+
+listing_options = active_listings_df.get("composite_id", pd.Series(dtype=str)).dropna().tolist()
+if listing_options:
+    selected_listing = st.selectbox("Inspect listing history", listing_options)
+    history_df = get_listing_history(bundle, selected_listing)
+    if not history_df.empty:
+        st.dataframe(history_df, use_container_width=True, hide_index=True)
+    else:
+        empty_panel("No listing history was found for the selected record.")
+
+st.markdown("<h2 class='section-title'>Data Quality and Coverage</h2>", unsafe_allow_html=True)
+quality_row = st.columns(5)
+quality_row[0].metric("Total rows", fmt_int(quality["total_records"]))
+quality_row[1].metric("Active rows", fmt_int(quality["active_records"]))
+quality_row[2].metric("Missing prices", fmt_int(quality["missing_price"]))
+quality_row[3].metric("Missing area", fmt_int(quality["missing_area"]))
+quality_row[4].metric("Location issues", fmt_int(quality["location_issues"]))
+
+if quality["location_issue_examples"]:
+    st.caption("Sample records flagged by the new district / borough sanity checks")
+    st.dataframe(pd.DataFrame(quality["location_issue_examples"]), use_container_width=True, hide_index=True)
+else:
+    empty_panel("Location sanity checks passed for the current filtered scope.")
