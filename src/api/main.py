@@ -311,8 +311,8 @@ def get_listings(
     size_max: Optional[float] = Query(None),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
-    sort_by: Optional[str] = Query("price_czk", description="Column to sort by"),
-    sort_order: Optional[str] = Query("desc", description="asc or desc"),
+    sort_by: Optional[str] = Query("listing_duration_days", description="Column to sort by"),
+    sort_order: Optional[str] = Query("asc", description="asc or desc"),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=500),
 ):
@@ -335,10 +335,15 @@ def get_listings(
 
     columns = [c for c in [
         "composite_id", "source", "property_type", "district_name", "borough_name",
-        "title", "price_czk", "price_per_m2_czk", "area_m2", "layout_type",
-        "seller_type", "listing_duration_days", "first_seen_at", "last_seen_at",
-        "property_link", "location_quality", "has_balcony", "has_parking",
-        "has_terrace", "has_elevator", "energy_class", "floor",
+        "prague_ring", "title", "layout_type", "bedroom_count", "is_studio",
+        "area_m2", "size_band", "price_czk", "price_per_m2_czk", "price_tier",
+        "price_changed", "price_change_czk", "price_change_pct",
+        "price_vs_district_median_pct", "seller_type", "floor", "floor_category",
+        "ownership_type", "energy_class", "is_new_build", "amenity_score",
+        "has_balcony", "has_parking", "has_terrace", "has_elevator", "has_cellar",
+        "listing_duration_days", "listing_age_bucket", "relisted",
+        "is_active", "is_removed",
+        "first_seen_at", "last_seen_at", "property_link", "location_quality",
     ] if c in page_df.columns]
 
     for col in ["first_seen_at", "last_seen_at"]:
