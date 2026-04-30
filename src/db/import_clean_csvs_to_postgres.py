@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +27,7 @@ def _read_csv(path: Path) -> pd.DataFrame:
 
 
 def _safe_datetime(series: pd.Series) -> pd.Series:
-    return pd.to_datetime(series, errors="coerce")
+    return pd.to_datetime(series, errors="coerce", utc=True)
 
 
 def _safe_numeric(series: pd.Series) -> pd.Series:
@@ -169,9 +170,19 @@ def _prepare_history(history_df: pd.DataFrame, current_df: pd.DataFrame) -> pd.D
         fallback = pd.to_datetime(out.get("last_seen_at", pd.Timestamp.utcnow()), errors="coerce")
         out["scraped_at"] = fallback
     out["scraped_at"] = _safe_datetime(out["scraped_at"])
+    snapshot_fallback = pd.to_datetime(_series_or_default(out, "snapshot_date"), errors="coerce", utc=True)
+    last_seen_fallback = pd.to_datetime(_series_or_default(out, "last_seen_at"), errors="coerce", utc=True)
+    first_seen_fallback = pd.to_datetime(_series_or_default(out, "first_seen_at"), errors="coerce", utc=True)
+    out["scraped_at"] = (
+        out["scraped_at"]
+        .fillna(snapshot_fallback)
+        .fillna(last_seen_fallback)
+        .fillna(first_seen_fallback)
+    )
     out["snapshot_date"] = pd.to_datetime(out.get("snapshot_date", out["scraped_at"]), errors="coerce").dt.date
     if "exists_on_source" not in out.columns:
         out["exists_on_source"] = True
+    out = out.dropna(subset=["scraped_at"]).copy()
     return out
 
 
@@ -185,6 +196,33 @@ def _bool_value(value):
 
 def _null_if_nan(value):
     return None if pd.isna(value) else value
+
+
+def _first_present(*values, default=None):
+    for value in values:
+        if not pd.isna(value):
+            return value
+    return default
+
+
+def _jsonb_text(value):
+    value = _null_if_nan(value)
+    if value is None:
+        return None
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, str):
+        text_value = value.strip()
+        if not text_value:
+            return None
+        try:
+            return json.dumps(json.loads(text_value), ensure_ascii=False)
+        except json.JSONDecodeError:
+            try:
+                return json.dumps(ast.literal_eval(text_value), ensure_ascii=False)
+            except (ValueError, SyntaxError):
+                return json.dumps(text_value, ensure_ascii=False)
+    return json.dumps(value, ensure_ascii=False)
 
 
 def _json_payload(row: pd.Series) -> Dict:
@@ -272,9 +310,9 @@ def _upsert_listings(conn, current_df: pd.DataFrame, source_map: Dict[str, int])
                 "transaction_type": "sale",
                 "listing_url": _null_if_nan(row.get("property_link")) or _null_if_nan(row.get("listing_url")),
                 "latest_title": _null_if_nan(row.get("title")),
-                "first_seen_at": row.get("first_seen_at") or row.get("last_seen_at") or datetime.utcnow(),
-                "last_seen_at": row.get("last_seen_at") or row.get("first_seen_at") or datetime.utcnow(),
-                "latest_snapshot_date": row.get("snapshot_date") or pd.Timestamp.utcnow().date(),
+                "first_seen_at": _first_present(row.get("first_seen_at"), row.get("last_seen_at"), default=datetime.utcnow()),
+                "last_seen_at": _first_present(row.get("last_seen_at"), row.get("first_seen_at"), default=datetime.utcnow()),
+                "latest_snapshot_date": _first_present(row.get("snapshot_date"), default=pd.Timestamp.utcnow().date()),
                 "current_status": "removed" if _bool_value(row.get("is_removed")) else "active",
                 "last_known_price_czk": _null_if_nan(row.get("price_czk")),
                 "last_known_price_per_m2_czk": _null_if_nan(row.get("price_per_m2_czk")),
@@ -292,7 +330,9 @@ def _upsert_listings(conn, current_df: pd.DataFrame, source_map: Dict[str, int])
 
 def _insert_scrape_runs(conn, history_df: pd.DataFrame) -> Dict[pd.Timestamp, int]:
     run_map = {}
-    grouped = history_df.groupby("scraped_at", dropna=True)
+    normalized_history = history_df.copy()
+    normalized_history["scraped_at"] = pd.to_datetime(normalized_history["scraped_at"], errors="coerce", utc=True)
+    grouped = normalized_history.groupby("scraped_at", dropna=True)
     for scraped_at, frame in grouped:
         snapshot_date = pd.Timestamp(scraped_at).date()
         run_id = conn.execute(
@@ -349,7 +389,9 @@ def _insert_snapshots_and_events(
 
     for row in history_df.to_dict("records"):
         listing_id = listing_id_map.get(row.get("composite_id"))
-        if listing_id is None:
+        scraped_at = pd.Timestamp(row["scraped_at"]) if not pd.isna(row.get("scraped_at")) else None
+        scrape_run_id = scrape_run_map.get(scraped_at) if scraped_at is not None else None
+        if listing_id is None or scrape_run_id is None:
             continue
         conn.execute(
             text(
@@ -378,7 +420,7 @@ def _insert_snapshots_and_events(
             ),
             {
                 "listing_id": listing_id,
-                "scrape_run_id": scrape_run_map[pd.Timestamp(row["scraped_at"])],
+                "scrape_run_id": scrape_run_id,
                 "snapshot_date": row.get("snapshot_date"),
                 "scraped_at": row.get("scraped_at"),
                 "exists_on_source": _bool_value(row.get("exists_on_source")),
@@ -413,7 +455,7 @@ def _insert_snapshots_and_events(
                 "has_elevator": _bool_value(row.get("has_elevator")),
                 "has_cellar": _bool_value(row.get("has_cellar")),
                 "description": _null_if_nan(row.get("description")),
-                "details_json": _null_if_nan(row.get("details_json")),
+                "details_json": _jsonb_text(row.get("details_json")),
                 "listing_duration_days": _null_if_nan(row.get("listing_duration_days")),
                 "removed_duration_days": _null_if_nan(row.get("removed_duration_days")),
             },

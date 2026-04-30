@@ -4,12 +4,21 @@ from src.utils.logger import get_logger
 logger = get_logger("reports")
 
 
+def _normalize_datetime_column(frame: pd.DataFrame, column_name: str) -> pd.DataFrame:
+    if column_name not in frame.columns:
+        return frame
+    out = frame.copy()
+    out[column_name] = pd.to_datetime(out[column_name], errors="coerce", utc=True)
+    return out
+
+
 def generate_daily_price_csv(history_df, output_path="data/daily_price_report.csv"):
     logger.info("STAGE: Daily report CSV generation started")
     if history_df.empty:
         pd.DataFrame().to_csv(output_path, index=False)
         return output_path
     active = history_df[history_df["exists_on_source"] == True].copy()
+    active = _normalize_datetime_column(active, "scraped_at")
     report = (
         active.groupby(["scraped_at", "source", "property_type", "district_name", "borough_name"], dropna=False)
         .agg(
@@ -34,6 +43,7 @@ def generate_removed_listings_csv(current_df, output_path="data/removed_listings
         pd.DataFrame().to_csv(output_path, index=False)
         return output_path
     removed = current_df[current_df["is_removed"] == True].copy() if "is_removed" in current_df.columns else pd.DataFrame()
+    removed = _normalize_datetime_column(removed, "removed_at")
     if removed.empty:
         removed.to_csv(output_path, index=False)
         logger.info("STAGE: Removed listings CSV generation finished | empty")

@@ -7,6 +7,7 @@ from src.adapters.bezrealitky import BezrealitkyAdapter
 from src.db.database import engine
 from src.db.import_clean_csvs_to_postgres import import_clean_csvs_to_postgres
 from src.db.io import (
+    has_normalized_postgres_schema,
     init_db,
     read_postgres_current_state_df,
     read_postgres_history_df,
@@ -106,7 +107,8 @@ def run_pipeline(include_bezrealitky=False):
     processed_df = process_master_dataframe(raw_df)
     processed_df.to_csv(processed_csv, index=False)
     logger.info("STAGE: Loading previous market state")
-    if engine.dialect.name == "postgresql":
+    use_normalized_postgres = engine.dialect.name == "postgresql" and has_normalized_postgres_schema()
+    if use_normalized_postgres:
         previous_state = read_postgres_current_state_df()
         previous_history = read_postgres_history_df()
     else:
@@ -118,8 +120,6 @@ def run_pipeline(include_bezrealitky=False):
     current_state = enrich_district_medians(current_state)
     logger.info("STAGE: Building history snapshot")
     history_snapshot = build_history_snapshot(processed_df, previous_state, now)
-    logger.info("STAGE: Persisting current state to database")
-    write_dataframe_replace(current_state, "listings")
     logger.info("STAGE: Persisting history to database")
     full_history = pd.concat([previous_history, history_snapshot], ignore_index=True) if not previous_history.empty else history_snapshot.copy()
     # Deduplicate so repeated same-day runs don't accumulate duplicate history rows
@@ -131,7 +131,7 @@ def run_pipeline(include_bezrealitky=False):
     full_history.to_csv(history_csv, index=False)
     removed_state = current_state[current_state.get("is_removed", False) == True].copy() if "is_removed" in current_state.columns else pd.DataFrame()
     removed_state.to_csv(removed_csv, index=False)
-    if engine.dialect.name == "postgresql":
+    if use_normalized_postgres:
         logger.info("STAGE: Refreshing normalized PostgreSQL analytics tables")
         import_clean_csvs_to_postgres()
     else:
