@@ -9,6 +9,7 @@ import pandas as pd
 
 from src.db.io import read_postgres_current_state_df, read_postgres_history_df
 from src.utils.process_csv import NEIGHBOURHOOD_TO_ZONE, deduce_district_and_zone, is_valid_prague_zone
+from src.utils.state import repair_current_state, rebuild_daily_history_from_lifecycle
 
 
 NUMERIC_COLUMNS = [
@@ -55,7 +56,7 @@ PRAGUE_LATITUDE_REFERENCE = 50.08
 
 
 def _read_csv(path: str) -> pd.DataFrame:
-    return pd.read_csv(path) if Path(path).exists() else pd.DataFrame()
+    return pd.read_csv(path, low_memory=False) if Path(path).exists() else pd.DataFrame()
 
 
 def _normalize_bool(series: pd.Series) -> pd.Series:
@@ -143,15 +144,21 @@ def load_market_data(
     db_current = _prepare_frame(read_postgres_current_state_df())
     db_history = _prepare_frame(read_postgres_history_df())
     if not db_current.empty or not db_history.empty:
+        db_current = repair_current_state(db_current, db_history)
+        db_history = rebuild_daily_history_from_lifecycle(db_current, db_history)
         removed_df = db_current[db_current.get("is_removed", False) == True].copy() if "is_removed" in db_current.columns else pd.DataFrame()
         return MarketDataBundle(
             current_df=db_current,
             history_df=db_history,
             removed_df=removed_df,
         )
+    csv_current = _prepare_frame(_read_csv(current_path))
+    csv_history = _prepare_frame(_read_csv(history_path))
+    csv_current = repair_current_state(csv_current, csv_history)
+    csv_history = rebuild_daily_history_from_lifecycle(csv_current, csv_history)
     return MarketDataBundle(
-        current_df=_prepare_frame(_read_csv(current_path)),
-        history_df=_prepare_frame(_read_csv(history_path)),
+        current_df=csv_current,
+        history_df=csv_history,
         removed_df=_prepare_frame(_read_csv(removed_path)),
     )
 
@@ -375,11 +382,74 @@ def _movement_frame(current_snapshot: pd.DataFrame, previous_snapshot: pd.DataFr
     return pd.DataFrame(records)
 
 
+def _movement_counts(current_snapshot: pd.DataFrame, previous_snapshot: pd.DataFrame) -> Dict[str, int]:
+    if current_snapshot.empty and previous_snapshot.empty:
+        return {
+            "new_listings": 0,
+            "removed_listings": 0,
+            "price_increases": 0,
+            "price_reductions": 0,
+        }
+
+    current_cols = [column for column in ["composite_id", "price_czk"] if column in current_snapshot.columns]
+    previous_cols = [column for column in ["composite_id", "price_czk"] if column in previous_snapshot.columns]
+
+    current_compact = (
+        current_snapshot[current_cols]
+        .dropna(subset=["composite_id"])
+        .drop_duplicates(subset=["composite_id"], keep="last")
+        if current_cols
+        else pd.DataFrame(columns=["composite_id", "price_czk"])
+    )
+    previous_compact = (
+        previous_snapshot[previous_cols]
+        .dropna(subset=["composite_id"])
+        .drop_duplicates(subset=["composite_id"], keep="last")
+        if previous_cols
+        else pd.DataFrame(columns=["composite_id", "price_czk"])
+    )
+
+    current_ids = pd.Index(current_compact.get("composite_id", pd.Series(dtype="object")))
+    previous_ids = pd.Index(previous_compact.get("composite_id", pd.Series(dtype="object")))
+
+    new_count = int(len(current_ids.difference(previous_ids)))
+    removed_count = int(len(previous_ids.difference(current_ids)))
+
+    if "price_czk" not in current_compact.columns or "price_czk" not in previous_compact.columns:
+        return {
+            "new_listings": new_count,
+            "removed_listings": removed_count,
+            "price_increases": 0,
+            "price_reductions": 0,
+        }
+
+    price_join = current_compact.merge(
+        previous_compact,
+        on="composite_id",
+        how="inner",
+        suffixes=("_current", "_previous"),
+    )
+    comparable = price_join.dropna(subset=["price_czk_current", "price_czk_previous"])
+    increased = int((comparable["price_czk_current"] > comparable["price_czk_previous"]).sum())
+    reduced = int((comparable["price_czk_current"] < comparable["price_czk_previous"]).sum())
+
+    return {
+        "new_listings": new_count,
+        "removed_listings": removed_count,
+        "price_increases": increased,
+        "price_reductions": reduced,
+    }
+
+
 def get_market_overview(bundle: MarketDataBundle, filters: Optional[Dict] = None) -> Dict:
     context = _get_filtered_context(bundle, filters)
     current_active = context["current_active"]
     previous_snapshot = context["previous_snapshot"]
-    movement_df = _movement_frame(context["latest_snapshot"], previous_snapshot) if not previous_snapshot.empty else pd.DataFrame()
+    movement_counts = (
+        _movement_counts(context["latest_snapshot"], previous_snapshot)
+        if not previous_snapshot.empty
+        else {"new_listings": 0, "removed_listings": 0, "price_increases": 0, "price_reductions": 0}
+    )
 
     previous_active_count = len(previous_snapshot) if not previous_snapshot.empty else None
     previous_total_value = previous_snapshot["price_czk"].sum() if "price_czk" in previous_snapshot.columns and not previous_snapshot.empty else None
@@ -395,10 +465,10 @@ def get_market_overview(bundle: MarketDataBundle, filters: Optional[Dict] = None
         "median_listing_price": _summary_delta(current_active["price_czk"].median() if "price_czk" in current_active.columns else None, previous_median_price),
         "average_listing_price": _summary_delta(current_active["price_czk"].mean() if "price_czk" in current_active.columns else None, previous_average_price),
         "median_price_per_sqm": _summary_delta(current_active["price_per_m2_czk"].median() if "price_per_m2_czk" in current_active.columns else None, previous_median_ppsqm),
-        "new_listings": int((movement_df.get("movement") == "new").sum()) if not movement_df.empty else 0,
-        "removed_listings": int((movement_df.get("movement") == "removed").sum()) if not movement_df.empty else 0,
-        "price_increases": int((movement_df.get("movement") == "price_increase").sum()) if not movement_df.empty else 0,
-        "price_reductions": int((movement_df.get("movement") == "price_reduction").sum()) if not movement_df.empty else 0,
+        "new_listings": movement_counts["new_listings"],
+        "removed_listings": movement_counts["removed_listings"],
+        "price_increases": movement_counts["price_increases"],
+        "price_reductions": movement_counts["price_reductions"],
         "days_on_market_avg": current_active["listing_duration_days"].mean() if "listing_duration_days" in current_active.columns else None,
         "days_on_market_median": current_active["listing_duration_days"].median() if "listing_duration_days" in current_active.columns else None,
     }
@@ -425,21 +495,19 @@ def get_market_timeseries(bundle: MarketDataBundle, filters: Optional[Dict] = No
         .sort_values("snapshot_date")
     )
 
+    snapshot_frames = {
+        snapshot_date: frame.copy()
+        for snapshot_date, frame in active.groupby("snapshot_date", sort=True)
+    }
     movement_rows = []
     ordered_dates = trend["snapshot_date"].tolist()
     for index, snapshot_date in enumerate(ordered_dates):
-        current_snapshot = active[active["snapshot_date"] == snapshot_date].copy()
-        previous_snapshot = active[active["snapshot_date"] == ordered_dates[index - 1]].copy() if index > 0 else pd.DataFrame()
-        movement_df = _movement_frame(current_snapshot, previous_snapshot) if index > 0 else pd.DataFrame()
-        movement_rows.append(
-            {
-                "snapshot_date": snapshot_date,
-                "new_listings": int((movement_df.get("movement") == "new").sum()) if not movement_df.empty else 0,
-                "removed_listings": int((movement_df.get("movement") == "removed").sum()) if not movement_df.empty else 0,
-                "price_increases": int((movement_df.get("movement") == "price_increase").sum()) if not movement_df.empty else 0,
-                "price_reductions": int((movement_df.get("movement") == "price_reduction").sum()) if not movement_df.empty else 0,
-            }
+        movement_counts = (
+            _movement_counts(snapshot_frames[snapshot_date], snapshot_frames[ordered_dates[index - 1]])
+            if index > 0
+            else {"new_listings": 0, "removed_listings": 0, "price_increases": 0, "price_reductions": 0}
         )
+        movement_rows.append({"snapshot_date": snapshot_date, **movement_counts})
     trend = trend.merge(pd.DataFrame(movement_rows), on="snapshot_date", how="left")
     return trend
 

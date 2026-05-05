@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 import os
 import json
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,23 +39,34 @@ app.add_middleware(
 # Analytics service bootstrap
 # ---------------------------------------------------------------------------
 _bundle = None
+_bundle_lock = threading.Lock()
+_bootstrap_cache: Dict[str, Dict[str, Any]] = {}
 
 
 def _get_bundle():
     global _bundle
     if _bundle is None:
-        try:
-            from src.analytics.service import load_market_data
-            _bundle = load_market_data()
-        except Exception as exc:
-            return None
+        with _bundle_lock:
+            if _bundle is None:
+                try:
+                    from src.analytics.service import load_market_data
+                    _bundle = load_market_data()
+                except Exception:
+                    return None
     return _bundle
 
 
 def _reload_bundle():
-    global _bundle
+    global _bundle, _bootstrap_cache
     _bundle = None
+    _bootstrap_cache = {}
     return _get_bundle()
+
+
+def _source_cache_key(source: Optional[List[str]]) -> str:
+    if not source:
+        return ""
+    return "|".join(sorted(source))
 
 
 # ---------------------------------------------------------------------------
@@ -402,6 +414,7 @@ def get_listings(
 
     columns = [c for c in [
         "composite_id", "source", "property_type", "district_name", "borough_name",
+        "region_name",
         "prague_ring", "title", "layout_type", "bedroom_count", "is_studio",
         "area_m2", "size_band", "price_czk", "price_per_m2_czk", "price_tier",
         "price_changed", "price_change_czk", "price_change_pct",
@@ -482,7 +495,7 @@ def data_quality(
 def filter_options():
     bundle = _get_bundle()
     if bundle is None:
-        return {"sources": [], "property_types": [], "districts": [], "boroughs": [], "seller_types": []}
+        return {"sources": [], "property_types": [], "districts": [], "boroughs": [], "seller_types": [], "regions": []}
 
     from src.analytics.service import _apply_common_filters
     df = bundle.current_df
@@ -502,12 +515,73 @@ def filter_options():
         "property_types": _uniq("property_type"),
         "districts": _uniq("district_name"),
         "boroughs": _uniq("borough_name"),
+        "regions": _uniq("region_name"),
         "seller_types": _uniq("seller_type"),
         "price_min": _v(price_vals.min()) if not price_vals.empty else None,
         "price_max": _v(price_vals.max()) if not price_vals.empty else None,
         "size_min": _v(size_vals.min()) if not size_vals.empty else None,
         "size_max": _v(size_vals.max()) if not size_vals.empty else None,
     }
+
+
+@app.get("/api/dashboard/bootstrap", summary="Single payload for initial dashboard render")
+def dashboard_bootstrap(
+    source: Optional[List[str]] = Query(None),
+    per_page: int = Query(5000, ge=1, le=5000),
+    include_listings: bool = Query(False),
+):
+    bundle = _get_bundle()
+    if bundle is None:
+        raise HTTPException(503, "No market data available.")
+
+    from src.analytics.service import (
+        get_active_listings,
+        get_data_quality,
+        get_market_districts,
+        get_market_overview,
+        get_market_price_movements,
+        get_market_timeseries,
+    )
+
+    filters = _build_filters(
+        source=source,
+        property_type=None,
+        district=None,
+        borough=None,
+        seller_type=None,
+        search=None,
+        price_min=None,
+        price_max=None,
+        size_min=None,
+        size_max=None,
+        date_from=None,
+        date_to=None,
+    )
+
+    cache_key = f"{_source_cache_key(source)}::{per_page}::{include_listings}"
+    if cache_key in _bootstrap_cache:
+        return _bootstrap_cache[cache_key]
+
+    listings_df = pd.DataFrame()
+    if include_listings:
+        listings_df = get_active_listings(bundle, filters)
+        if not listings_df.empty:
+            listings_df = listings_df.sort_values("listing_duration_days", ascending=True, na_position="last").head(per_page)
+
+    filter_payload = filter_options()
+
+    payload = {
+        "overview": {k: (_clean_dict(v) if isinstance(v, dict) else _v(v)) for k, v in get_market_overview(bundle, filters).items()},
+        "timeseries": {"data": _clean_records(get_market_timeseries(bundle, filters))},
+        "districts": {"data": _clean_records(get_market_districts(bundle, filters))},
+        "movements": {"data": _clean_records(get_market_price_movements(bundle, filters))},
+        "listings": {"data": _clean_records(listings_df)},
+        "quality": _clean_dict(get_data_quality(bundle, filters)),
+        "availableSources": filter_payload.get("sources", []),
+        "filterOptions": filter_payload,
+    }
+    _bootstrap_cache[cache_key] = payload
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -522,3 +596,17 @@ def health():
         "data_loaded": has_data,
         "active_listings": int(len(bundle.current_df[bundle.current_df.get("is_active", False) == True])) if has_data else 0,
     }
+
+
+@app.on_event("startup")
+def warm_dashboard_cache():
+    def _warm():
+        try:
+            bundle = _get_bundle()
+            if bundle is None:
+                return
+            dashboard_bootstrap(source=["sreality"], per_page=5000, include_listings=False)
+        except Exception:
+            pass
+
+    threading.Thread(target=_warm, daemon=True).start()

@@ -109,7 +109,7 @@ tr:hover td{background:var(--bg-card2)}
       <div class="logo">🏙 Prague RE Intelligence</div>
       <span id="api-badge" class="api-badge mock">MOCK</span>
       <div class="src-divider"></div>
-      <div id="source-btns" style="display:flex;gap:4px"></div>
+      <select id="source-select" style="min-width:150px" aria-label="Source selector"></select>
     </div>
     <div class="header-right">
       <span id="header-date"></span>
@@ -436,7 +436,9 @@ function enrichListing(l) {
 }
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────────
-const API = '';
+const API = window.location.protocol === 'file:'
+  ? 'http://127.0.0.1:8000'
+  : '';
 const FMT = {
   czk: v => v==null?'n/a':Math.round(+v).toLocaleString('cs-CZ')+' Kč',
   m:   v => v==null?'n/a':((+v)/1e6).toFixed(1)+' M Kč',
@@ -523,7 +525,7 @@ let DATA=null, listings=[], filteredListings=[];
 let sortCol='listing_duration_days', sortAsc=true, page=1;
 const PER_PAGE=50;
 let movFilter='all', charts={};
-let activeSource=''; // '' = all sources
+let activeSource='sreality';
 let mapMode='boundary';
 let hexGridSize=18;
 
@@ -953,14 +955,14 @@ function refetchHexMap(){
 
 // ─── SOURCE SWITCHER ──────────────────────────────────────────────────────────
 function buildSourceButtons(sources){
-  const container=document.getElementById('source-btns');
-  if(!container||!sources||!sources.length) return;
-  const allSrcs=['', ...sources];
-  container.innerHTML=allSrcs.map(s=>{
-    const label=s?t('src.'+s):t('src.all');
-    const active=s===activeSource;
-    return`<button class="src-btn${active?' active':''}" onclick="setSource('${s}')">${label}</button>`;
-  }).join('');
+  const select=document.getElementById('source-select');
+  if(!select) return;
+  const normalizedSources=(sources&&sources.length)?sources:['sreality'];
+  if(activeSource && !normalizedSources.includes(activeSource) && activeSource!=='') activeSource=normalizedSources[0]||'';
+  if(!activeSource) activeSource='sreality';
+  const allSrcs=['', ...normalizedSources];
+  select.innerHTML=allSrcs.map(s=>`<option value="${s}">${s?t('src.'+s):t('src.all')}</option>`).join('');
+  select.value=allSrcs.includes(activeSource)?activeSource:(normalizedSources[0]||'');
 }
 function setSource(src){
   if(src===activeSource) return;
@@ -968,26 +970,19 @@ function setSource(src){
   document.getElementById('loading-text').textContent='Loading…';
   document.getElementById('loading').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
-  // Re-fetch everything for the selected source
-  const q=src?`&source=${encodeURIComponent(src)}`:'';
-  Promise.all([
-    fetch(`${API}/api/market/overview${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
-    fetch(`${API}/api/market/timeseries${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
-    fetch(`${API}/api/market/districts${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
-    fetch(`${API}/api/market/map?grain=borough${q}`).then(r=>r.json()),
-    fetch(`${API}/api/market/map?grain=district${q}`).then(r=>r.json()),
-    fetch(`${API}/api/market/map/hex?grid_size=${encodeURIComponent(hexGridSize)}${q}`).then(r=>r.json()),
-    fetch(`${API}/api/market/price-movements${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
-    fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc${q}`).then(r=>r.json()),
-    fetch(`${API}/api/market/data-quality${src?'?source='+encodeURIComponent(src):''}`).then(r=>r.json()),
-  ]).then(([ov,ts,di,mapB,mapD,mapHex,mv,ls,q])=>{
+  const q=src?`?source=${encodeURIComponent(src)}&per_page=5000&include_listings=false`:'?per_page=5000&include_listings=false';
+  fetch(`${API}/api/dashboard/bootstrap${q}`)
+  .then(r=>r.json())
+  .then(payload=>{
     const d={
-      overview:ov,timeseries:ts.data||[],districts:di.data||[],
-      mapBoroughs:mapB.data||[],mapDistricts:mapD.data||[],
-      mapHex:mapHex,
-      movements:mv.data||[],listings:ls.data||[],quality:q,
-      availableSources:DATA.availableSources,
-      pragueGeojson:DATA.pragueGeojson || null,
+      overview:payload.overview||{},
+      timeseries:payload.timeseries?.data||[],
+      districts:payload.districts?.data||[],
+      movements:payload.movements?.data||[],
+      listings:payload.listings?.data||[],
+      quality:payload.quality||{},
+      availableSources:payload.availableSources||DATA.availableSources||[],
+      filterOptions:payload.filterOptions||DATA.filterOptions||{},
     };
     DATA=d; DATA._status='live';
     listings=(d.listings||[]).map(enrichListing).filter(l=>l.is_active!==false);
@@ -996,11 +991,24 @@ function setSource(src){
     applyTranslations();
     buildSourceButtons(DATA.availableSources);
     renderAll(d);
+    fetchListingsInBackground();
   }).catch(e=>{
     console.error('Source switch failed:',e);
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
   });
+}
+
+function fetchListingsInBackground(){
+  const q=activeSource?`&source=${encodeURIComponent(activeSource)}`:'';
+  fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc${q}`)
+    .then(r=>r.json())
+    .then(ls=>{
+      DATA.listings=ls.data||[];
+      listings=(DATA.listings||[]).map(enrichListing).filter(l=>l.is_active!==false);
+      renderAll(DATA);
+    })
+    .catch(e=>console.error('Listings background load failed:',e));
 }
 
 // ─── RENDER: KPIs ──────────────────────────────────────────────────────────────
@@ -1267,12 +1275,12 @@ function resetFilters(){
 }
 
 // ─── RENDER: FILTER DROPDOWNS ─────────────────────────────────────────────────
-function populateFilterOptions(all){
-  const districts=[...new Set(all.map(l=>l.district_name).filter(Boolean))].sort();
-  const boroughs=[...new Set(all.map(l=>l.borough_name).filter(Boolean))].sort();
-  const types=[...new Set(all.map(l=>l.property_type).filter(Boolean))].sort();
-  const sellers=[...new Set(all.map(l=>l.seller_type).filter(Boolean))].sort();
-  const regions=[...new Set(all.map(l=>l.region_name).filter(Boolean))].sort();
+function populateFilterOptions(all, options){
+  const districts=(options?.districts?.length?options.districts:[...new Set(all.map(l=>l.district_name).filter(Boolean))]).sort();
+  const boroughs=(options?.boroughs?.length?options.boroughs:[...new Set(all.map(l=>l.borough_name).filter(Boolean))]).sort();
+  const types=(options?.property_types?.length?options.property_types:[...new Set(all.map(l=>l.property_type).filter(Boolean))]).sort();
+  const sellers=(options?.seller_types?.length?options.seller_types:[...new Set(all.map(l=>l.seller_type).filter(Boolean))]).sort();
+  const regions=(options?.regions?.length?options.regions:[...new Set(all.map(l=>l.region_name).filter(Boolean))]).sort();
 
   const ds=document.getElementById('filter-district');
   const bs=document.getElementById('filter-borough');
@@ -1311,7 +1319,7 @@ function renderQuality(q){
 function setLang(l){
   lang=l;
   applyTranslations();
-  if(DATA){ buildSourceButtons(DATA.availableSources); renderAll(DATA); }
+    if(DATA){ buildSourceButtons(DATA.availableSources); renderAll(DATA); }
 }
 
 function renderAll(d){
@@ -1329,7 +1337,7 @@ function renderAll(d){
   renderPropertyBreakdown(listings);
   renderInvestorSignals(listings,d.timeseries||[]);
   renderMovements(d.movements||[]);
-  populateFilterOptions(listings);
+  populateFilterOptions(listings, d.filterOptions || null);
   renderListings();
   renderQuality(d.quality||{});
 }
@@ -1346,6 +1354,10 @@ function mount(d, status){
     applyTranslations();
     buildSourceButtons(d.availableSources||[]);
     renderAll(d);
+    const sourceSelect=document.getElementById('source-select');
+    if(sourceSelect){
+      sourceSelect.onchange=(e)=>setSource(e.target.value);
+    }
     ['search-input','filter-district','filter-borough','filter-type','filter-ring','filter-region',
      'filter-seller','filter-bedrooms','filter-tier','filter-price-min','filter-price-max',
      'filter-area-min','filter-area-max','filter-newbuild'].forEach(id=>{
@@ -1362,27 +1374,21 @@ function mount(d, status){
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 async function boot(){
   try{
-    // Fetch available sources first
-    const filtersR = await fetch(`${API}/api/market/filter-options`).catch(()=>null);
-    const filtersData = filtersR && filtersR.ok ? await filtersR.json() : null;
-    const availableSources = filtersData?.sources || ['sreality'];
-
-    const [ovR,tsR,diR,mapBR,mapDR,mapHexR,mvR,lsR,qR,geoR]=await Promise.all([
-      fetch(`${API}/api/market/overview`),
-      fetch(`${API}/api/market/timeseries`),
-      fetch(`${API}/api/market/districts`),
-      fetch(`${API}/api/market/map?grain=borough`),
-      fetch(`${API}/api/market/map?grain=district`),
-      fetch(`${API}/api/market/map/hex?grid_size=${encodeURIComponent(hexGridSize)}`),
-      fetch(`${API}/api/market/price-movements`),
-      fetch(`${API}/api/listings?per_page=5000&sort_by=listing_duration_days&sort_order=asc`),
-      fetch(`${API}/api/market/data-quality`),
-      fetch(`${API}/api/market/geo/prague-city-parts`),
-    ]);
-    if(!ovR.ok) throw new Error('API unavailable');
-    if(!lsR.ok) throw new Error(`Listings API error: ${lsR.status}`);
-    const [ov,ts,di,mapB,mapD,mapHex,mv,ls,q,geo]=await Promise.all([ovR.json(),tsR.json(),diR.json(),mapBR.json(),mapDR.json(),mapHexR.json(),mvR.json(),lsR.json(),qR.json(),geoR.ok ? geoR.json() : Promise.resolve(null)]);
-    mount({overview:ov,timeseries:ts.data||[],districts:di.data||[],mapBoroughs:mapB.data||[],mapDistricts:mapD.data||[],mapHex:mapHex,movements:mv.data||[],listings:ls.data||[],quality:q,availableSources,pragueGeojson:geo},'live');
+    const q=activeSource?`?source=${encodeURIComponent(activeSource)}&per_page=5000&include_listings=false`:'?per_page=5000&include_listings=false';
+    const res=await fetch(`${API}/api/dashboard/bootstrap${q}`);
+    if(!res.ok) throw new Error('API unavailable');
+    const payload=await res.json();
+    mount({
+      overview:payload.overview||{},
+      timeseries:payload.timeseries?.data||[],
+      districts:payload.districts?.data||[],
+      movements:payload.movements?.data||[],
+      listings:payload.listings?.data||[],
+      quality:payload.quality||{},
+      availableSources:payload.availableSources||['sreality'],
+      filterOptions:payload.filterOptions||{},
+    },'live');
+    fetchListingsInBackground();
   }catch(e){
     console.warn('[Dashboard] API unavailable, using mock data:',e.message);
     mount(makeMock(),'mock');
