@@ -17,7 +17,13 @@ from src.db.io import (
 from src.reports.generate_reports import generate_daily_price_csv, generate_market_report_html, generate_removed_listings_csv
 from src.utils.logger import get_logger
 from src.utils.process_csv import process_master_dataframe
-from src.utils.state import reconcile_current_with_previous, build_history_snapshot
+from src.utils.description_enrichment import enrich_from_descriptions
+from src.utils.state import (
+    reconcile_current_with_previous,
+    build_history_snapshot,
+    repair_current_state,
+    rebuild_daily_history_from_lifecycle,
+)
 
 logger = get_logger("pipeline")
 
@@ -105,6 +111,9 @@ def run_pipeline(include_bezrealitky=False):
     raw_df.to_csv(master_csv, index=False)
     logger.info("STAGE: Processing scraped rows into structured dataset")
     processed_df = process_master_dataframe(raw_df)
+    logger.info("STAGE: Description-based address enrichment")
+    processed_df, n_desc_enriched = enrich_from_descriptions(processed_df)
+    logger.info(f"STAGE: Description enrichment updated {n_desc_enriched} rows")
     processed_df.to_csv(processed_csv, index=False)
     logger.info("STAGE: Loading previous market state")
     use_normalized_postgres = engine.dialect.name == "postgresql" and has_normalized_postgres_schema()
@@ -122,10 +131,8 @@ def run_pipeline(include_bezrealitky=False):
     history_snapshot = build_history_snapshot(processed_df, previous_state, now)
     logger.info("STAGE: Persisting history to database")
     full_history = pd.concat([previous_history, history_snapshot], ignore_index=True) if not previous_history.empty else history_snapshot.copy()
-    # Deduplicate so repeated same-day runs don't accumulate duplicate history rows
-    full_history = full_history.drop_duplicates(
-        subset=["composite_id", "scraped_at", "exists_on_source"], keep="last"
-    ).reset_index(drop=True)
+    current_state = repair_current_state(current_state, full_history, now)
+    full_history = rebuild_daily_history_from_lifecycle(current_state, full_history)
     logger.info("STAGE: Writing CSV mirrors")
     current_state.to_csv(processed_csv, index=False)
     full_history.to_csv(history_csv, index=False)
@@ -144,12 +151,36 @@ def run_pipeline(include_bezrealitky=False):
     generate_market_report_html(current_state)
     generate_removed_listings_csv(current_state, removed_csv)
 
+    # ── Per-region active-listing breakdown ──────────────────────────────────
+    # The "active_rows" count includes BOTH Prague and Středočeský kraj listings.
+    # Breaking it down prevents confusion when comparing runs that added a new
+    # region vs runs where the same region's count changed day-over-day.
+    active_state = current_state[current_state.get("is_active", True) == True] if "is_active" in current_state.columns else current_state
+    active_by_region: dict = {}
+    if "property_search_type" in active_state.columns:
+        for pst, grp in active_state.groupby("property_search_type"):
+            active_by_region[str(pst)] = int(len(grp))
+
+    # Roll up by scope (Praha vs Středočeský kraj)
+    prague_active = sum(v for k, v in active_by_region.items() if not k.endswith("_sc"))
+    sc_active     = sum(v for k, v in active_by_region.items() if k.endswith("_sc"))
+
+    logger.info(
+        f"STAGE: Active listing breakdown | Praha: {prague_active} | "
+        f"Středočeský kraj: {sc_active} | Total: {prague_active + sc_active}"
+    )
+
     pipeline_summary = {
         "scraped_rows": int(len(raw_df)),
         "active_rows": int(summary.get("active_listings", 0)),
+        # Per-region breakdown so the daily count is interpretable
+        "active_rows_prague":          prague_active,
+        "active_rows_stredocesky":     sc_active,
+        "active_rows_by_search_type":  active_by_region,
         "new_listings": int(summary.get("new_listings", 0)),
         "removed_listings": int(summary.get("removed_listings", 0)),
         "price_changes": int(summary.get("price_changes", 0)),
+        "desc_enriched_rows": int(n_desc_enriched),
         "master_csv": master_csv,
         "processed_csv": processed_csv,
         "history_csv": history_csv,

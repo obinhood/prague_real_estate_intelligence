@@ -14,6 +14,7 @@ from src.db.database import engine
 from src.db.postgres_schema import apply_postgres_schema
 from src.utils.logger import get_logger
 from src.utils.process_csv import extract_detail_features, looks_like_listing_title, parse_title
+from src.utils.state import repair_current_state, rebuild_daily_history_from_lifecycle
 
 logger = get_logger("postgres-import")
 
@@ -23,7 +24,7 @@ CLEAN_DIR = DATA_DIR / "cleaned"
 
 
 def _read_csv(path: Path) -> pd.DataFrame:
-    return pd.read_csv(path) if path.exists() else pd.DataFrame()
+    return pd.read_csv(path, low_memory=False) if path.exists() else pd.DataFrame()
 
 
 def _safe_datetime(series: pd.Series) -> pd.Series:
@@ -393,6 +394,7 @@ def _insert_snapshots_and_events(
         scrape_run_id = scrape_run_map.get(scraped_at) if scraped_at is not None else None
         if listing_id is None or scrape_run_id is None:
             continue
+        is_stredocesky = str(row.get("property_search_type") or "").lower().endswith("_sc")
         conn.execute(
             text(
                 """
@@ -440,9 +442,9 @@ def _insert_snapshots_and_events(
                 "borough_name": _null_if_nan(row.get("borough_name")),
                 "prague_zone": _null_if_nan(row.get("prague_zone")),
                 "location_quality": _null_if_nan(row.get("location_quality")) or "ok",
-                "city_name": _null_if_nan(row.get("city_name")) or "Praha",
-                "region_name": _null_if_nan(row.get("region_name")) or "Praha",
-                "country_name": _null_if_nan(row.get("country_name")) or "Czech Republic",
+                "city_name": _first_present(_null_if_nan(row.get("city_name")), _null_if_nan(row.get("district_name")), default=None if is_stredocesky else "Praha"),
+                "region_name": _first_present(_null_if_nan(row.get("region_name")), default="Středočeský kraj" if is_stredocesky else "Praha"),
+                "country_name": _first_present(_null_if_nan(row.get("country_name")), default="Czech Republic"),
                 "latitude": _null_if_nan(row.get("latitude")),
                 "longitude": _null_if_nan(row.get("longitude")),
                 "seller_type": _null_if_nan(row.get("seller_type")),
@@ -560,9 +562,9 @@ def _refresh_district_reference(conn, current_df: pd.DataFrame):
                 """
             ),
             {
-                "district_name": row.get("district_name") or "Praha - Ostatní",
-                "borough_name": row.get("borough_name") or "Praha - Ostatní",
-                "prague_zone": row.get("prague_zone") or row.get("district_name") or "Praha - Ostatní",
+                "district_name": row.get("district_name"),
+                "borough_name": row.get("borough_name"),
+                "prague_zone": row.get("prague_zone") or row.get("district_name") or row.get("borough_name"),
             },
         )
 
@@ -584,6 +586,8 @@ def import_clean_csvs_to_postgres() -> Tuple[Dict[str, Path], Dict[str, int]]:
 
     current_df = _prepare_current_state(processed_df, removed_df)
     history_df = _prepare_history(history_df, current_df)
+    current_df = repair_current_state(current_df, history_df)
+    history_df = rebuild_daily_history_from_lifecycle(current_df, history_df)
 
     apply_postgres_schema()
 

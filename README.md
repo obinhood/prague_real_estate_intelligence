@@ -78,7 +78,7 @@ python run_pipeline.py --bezrealitky
 python start_api.py
 ```
 
-Then open [http://localhost:8000](http://localhost:8000).
+Then open [http://localhost:8001](http://localhost:8001).
 
 ### 6. Run tests
 

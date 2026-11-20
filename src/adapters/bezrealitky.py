@@ -11,6 +11,23 @@ from src.utils.logger import get_logger
 logger = get_logger("bezrealitky")
 
 
+LISTING_HREF_RE = re.compile(
+    r"/(?:nemovitosti-[a-z-]+|detail)/(?P<id>\d+)(?:[-/]|$)",
+    re.IGNORECASE,
+)
+LAYOUT_HINT_RE = re.compile(r"\b\d+\+(?:kk|1)\b", re.IGNORECASE)
+AREA_HINT_RE = re.compile(r"\b\d+(?:[.,]\d+)?\s*m²\b", re.IGNORECASE)
+PRICE_HINT_RE = re.compile(r"\b\d[\d\s\xa0]*\s*Kč\b", re.IGNORECASE)
+PROPERTY_TITLE_PREFIX_RE = re.compile(
+    r"^(?P<prefix>Prodej\s+(?:bytu|domu|pozemku|gar[aá]že|gar[aá]žov[eé]ho\s+st[aá]n[ií]|komer[cč]n[ií]ho?\s+prostoru?))\s*(?P<address>.*)$",
+    re.IGNORECASE,
+)
+HEADING_TITLE_RE = re.compile(
+    r"(Prodej\s+(?:bytu|domu|pozemku|gar[aá]že|gar[aá]žov[eé]ho\s+st[aá]n[ií]|komer[cč]n[ií]ho?\s+prostoru?)\s+.+?)(?=\s+\d+\+(?:kk|1)\b|\s+\d+(?:[.,]\d+)?\s*m²\b|\s+\d[\d\s\xa0]*\s*Kč\b|$)",
+    re.IGNORECASE,
+)
+
+
 class BezrealitkyAdapter:
     source_name = "bezrealitky"
 
@@ -54,8 +71,91 @@ class BezrealitkyAdapter:
         return f"{self.domain}{url if url.startswith('/') else '/' + url}"
 
     def extract_url_id(self, url):
-        m = re.search(r"/(\d+)(?:-|/|$)", url)
+        m = LISTING_HREF_RE.search(url or "")
         return m.group(1) if m else url
+
+    def _extract_card_context_text(self, anchor):
+        node = anchor
+        best_text = clean_text(anchor.get_text(" ", strip=True))
+        for _ in range(6):
+            node = getattr(node, "parent", None)
+            if node is None:
+                break
+            candidate = clean_text(node.get_text(" ", strip=True))
+            if not candidate:
+                continue
+            best_text = candidate
+            if PRICE_HINT_RE.search(candidate) and (
+                AREA_HINT_RE.search(candidate) or LAYOUT_HINT_RE.search(candidate)
+            ):
+                return candidate
+        return best_text
+
+    def _strip_listing_noise(self, text):
+        cleaned = clean_text(text)
+        if not cleaned:
+            return cleaned
+        cleaned = re.sub(
+            r"^(?:Předchozí|Následující|Přidat do oblíbených|Nový|Nepřehlédněte|Developerský projekt|Prodává Bezrealitky|Image)\s+",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(
+            r"^(?:(?:Předchozí|Následující|Přidat do oblíbených|Nový|Nepřehlédněte|Developerský projekt|Prodává Bezrealitky|Image)\s+)+",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        cleaned = re.sub(r"\s+Hypotéka již od.*$", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+\(\s*\d[\d\s\xa0]*Kč\s*/\s*m²\s*\)", "", cleaned, flags=re.IGNORECASE)
+        return clean_text(cleaned)
+
+    def _extract_heading_title(self, text):
+        cleaned = self._strip_listing_noise(text)
+        if not cleaned:
+            return None
+        match = HEADING_TITLE_RE.search(cleaned)
+        if match:
+            return clean_text(match.group(1))
+        return cleaned
+
+    def _build_listing_title(self, anchor_title, context_text):
+        anchor_title = self._strip_listing_noise(anchor_title)
+        context_text = self._strip_listing_noise(context_text)
+        title_seed = self._extract_heading_title(anchor_title) or self._extract_heading_title(context_text) or anchor_title
+
+        if looks_like_listing_title(title_seed) and not any(
+            noise in title_seed.lower() for noise in ["předchozí", "následující", "hypotéka již od"]
+        ):
+            return title_seed
+
+        if not title_seed:
+            return context_text
+
+        match = PROPERTY_TITLE_PREFIX_RE.match(title_seed)
+        if not match:
+            return context_text if looks_like_listing_title(context_text) else anchor_title
+
+        prefix = clean_text(match.group("prefix"))
+        address = clean_text(match.group("address"))
+        layout = clean_text(LAYOUT_HINT_RE.search(context_text).group(0)) if LAYOUT_HINT_RE.search(context_text) else None
+        area = clean_text(AREA_HINT_RE.search(context_text).group(0)) if AREA_HINT_RE.search(context_text) else None
+        price = clean_text(PRICE_HINT_RE.search(context_text).group(0)) if PRICE_HINT_RE.search(context_text) else None
+
+        pieces = [prefix]
+        if layout:
+            pieces.append(layout)
+        if area:
+            pieces.append(area)
+        if address:
+            pieces.append(address)
+        if price:
+            pieces.append(price)
+        rebuilt = clean_text(" ".join(piece for piece in pieces if piece))
+        if looks_like_listing_title(rebuilt):
+            return rebuilt
+        return context_text if looks_like_listing_title(context_text) else rebuilt
 
     def detect_max_pages(self, base_url):
         html = self.fetch(base_url)
@@ -78,16 +178,18 @@ class BezrealitkyAdapter:
             href_l = href.lower()
             if "bezrealitky.cz" not in full_url.lower():
                 continue
-            if not re.search(r"/(nemovitosti-byty-domy|detail)/\d+", href_l):
+            if not LISTING_HREF_RE.search(href_l):
                 continue
             url_id = self.extract_url_id(full_url)
             composite_id = f"{self.source_name}_{property_search_type}_{url_id}"
             if composite_id in seen:
                 continue
-            seen.add(composite_id)
-            title = clean_text(a.get_text(" ", strip=True))
+            raw_title = clean_text(a.get_text(" ", strip=True))
+            context_text = self._extract_card_context_text(a)
+            title = self._build_listing_title(raw_title, context_text)
             if not looks_like_listing_title(title):
                 continue
+            seen.add(composite_id)
             rows.append({
                 "composite_id": composite_id,
                 "url_id": url_id,

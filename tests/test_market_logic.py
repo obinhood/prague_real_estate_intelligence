@@ -3,7 +3,9 @@ from pathlib import Path
 import unittest
 
 import pandas as pd
+from bs4 import BeautifulSoup
 
+from src.adapters.bezrealitky import BezrealitkyAdapter
 from src.analytics.service import _prepare_frame, get_market_overview, MarketDataBundle
 from src.utils.process_csv import deduce_district_and_zone, infer_market_scope, infer_property_type, looks_like_listing_title, parse_title
 from src.utils.state import build_history_snapshot, reconcile_current_with_previous
@@ -23,6 +25,29 @@ class MarketLogicTests(unittest.TestCase):
         self.assertFalse(looks_like_listing_title("prodeje pozemků"))
         self.assertTrue(looks_like_listing_title("Prodej bytu 2+kk 54 m² Praha - Smíchov 8 490 000 Kč"))
 
+    def test_bezrealitky_card_context_rebuilds_listing_title(self):
+        html = """
+        <div class="listing-card">
+          <h2>
+            <a href="/nemovitosti-byty-domy/1007903-nabidka-prodej-bytu-sazovicka-praha">
+              Prodej bytu Sazovická, Praha - Zličín
+            </a>
+          </h2>
+          <ul>
+            <li>3+kk</li>
+            <li>87 m²</li>
+          </ul>
+          <div>12 650 000 Kč</div>
+        </div>
+        """
+        rows = BezrealitkyAdapter().parse_listing_cards(BeautifulSoup(html, "html.parser"), "byt")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["url_id"], "1007903")
+        self.assertEqual(
+            rows[0]["title"],
+            "Prodej bytu 3+kk 87 m² Sazovická, Praha - Zličín 12 650 000 Kč",
+        )
+
     def test_location_separates_borough_and_district(self):
         borough, district, zone, quality = deduce_district_and_zone("Nádražní, Praha - Smíchov", "Prodej bytu 2+kk 54 m²")
         self.assertEqual(borough, "Smíchov")
@@ -35,6 +60,7 @@ class MarketLogicTests(unittest.TestCase):
         self.assertEqual(infer_market_scope("dum_sc"), "stredocesky_kraj")
         parsed = parse_title("Prodej domu 120 m² Mělník 8 900 000 Kč", "dum_sc")
         self.assertEqual(parsed["region_name"], "Středočeský kraj")
+        self.assertEqual(parsed["borough_name"], "Mělník")
         self.assertEqual(parsed["district_name"], "Mělník")
         self.assertIsNone(parsed["prague_zone"])
         price_like_zone = parse_title("Prodej bytu atypický 129 m² Křižíkova, Praha 26 560 000 Kč", "byt")

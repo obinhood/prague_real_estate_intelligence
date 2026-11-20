@@ -8,8 +8,14 @@ CONFIG = {
     ),
     "max_pages": None,
     "enable_detail_scraping": True,
-    "max_workers_listing_details": 4,
-    "detail_progress_log_every": 25,
+    # Detail-page workers: 8 halves scrape time vs the old default of 4.
+    # Sreality tolerates this without rate-limiting in practice.
+    # Raise to 12 for faster runs; lower to 4 if you start seeing 429 errors.
+    "max_workers_listing_details": 8,
+    # List-page workers: scrapes all property types concurrently.
+    # Each type still fetches its own pages sequentially to preserve order.
+    "max_workers_list_pages": 4,
+    "detail_progress_log_every": 50,
     "sources": {
         "sreality": {
             "domain": "https://www.sreality.cz",

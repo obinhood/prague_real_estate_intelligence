@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 import pandas as pd
+from src.utils.process_csv import infer_market_scope, parse_title
 from src.utils.logger import get_logger
 
 logger = get_logger("state")
@@ -33,6 +36,11 @@ HISTORY_COLS = [
     "description", "details_json",
     "has_balcony", "has_parking", "has_terrace", "has_elevator", "has_cellar", "amenity_score",
     "scraped_at", "snapshot_date", "exists_on_source",
+]
+
+GEO_FILL_COLS = [
+    "full_address", "street_address", "borough_name", "district_name",
+    "prague_zone", "location_quality", "city_name", "region_name", "country_name",
 ]
 
 
@@ -88,6 +96,75 @@ def _status_subset(df, column_name, expected=True):
     if df.empty or column_name not in df.columns:
         return pd.DataFrame(columns=df.columns)
     return df[df[column_name] == expected].copy()
+
+
+def _to_ts(value):
+    try:
+        ts = pd.to_datetime(value, errors="coerce")
+        return ts if pd.notna(ts) else pd.NaT
+    except Exception:
+        return pd.NaT
+
+
+def _to_date(value):
+    ts = _to_ts(value)
+    return ts.date() if pd.notna(ts) else None
+
+
+def _effective_removed_date(row, fallback_latest_date=None):
+    removed_at = _to_date(row.get("removed_at"))
+    if removed_at:
+        return removed_at
+    if _safe_bool(row.get("is_removed"), default=False):
+        last_seen = _to_date(row.get("last_seen_at"))
+        if last_seen:
+            return last_seen + timedelta(days=1)
+        snapshot_date = _to_date(row.get("snapshot_date"))
+        if snapshot_date:
+            return snapshot_date
+        return fallback_latest_date
+    return None
+
+
+def _repair_geo_fields(row_dict):
+    scope = infer_market_scope(row_dict.get("property_search_type"))
+    parsed = parse_title(row_dict.get("title"), row_dict.get("property_search_type"))
+
+    if not row_dict.get("region_name"):
+        row_dict["region_name"] = parsed.get("region_name")
+    if not row_dict.get("city_name"):
+        row_dict["city_name"] = parsed.get("city_name")
+    if not row_dict.get("country_name"):
+        row_dict["country_name"] = parsed.get("country_name")
+
+    is_prague = scope == "praha" or str(row_dict.get("district_name") or "").startswith("Praha")
+    if is_prague:
+        if not row_dict.get("district_name") or row_dict.get("district_name") == "Praha - Ostatní":
+            row_dict["district_name"] = parsed.get("district_name")
+        if not row_dict.get("borough_name") or row_dict.get("borough_name") == "Praha - Ostatní":
+            row_dict["borough_name"] = parsed.get("borough_name")
+        if not row_dict.get("prague_zone") or row_dict.get("prague_zone") == "Praha - Ostatní":
+            row_dict["prague_zone"] = parsed.get("prague_zone")
+    else:
+        locality = row_dict.get("district_name")
+        if not locality or locality == "Praha - Ostatní":
+            locality = row_dict.get("borough_name")
+        if not locality or locality == "Praha - Ostatní":
+            locality = parsed.get("borough_name")
+        if locality == "Praha - Ostatní":
+            locality = None
+        row_dict["district_name"] = locality
+        row_dict["borough_name"] = locality
+        row_dict["prague_zone"] = None
+        if not row_dict.get("city_name"):
+            row_dict["city_name"] = locality
+        if not row_dict.get("region_name"):
+            row_dict["region_name"] = parsed.get("region_name") or "Středočeský kraj"
+    if not row_dict.get("region_name"):
+        row_dict["region_name"] = "Praha" if scope == "praha" else "Středočeský kraj"
+    if not row_dict.get("city_name"):
+        row_dict["city_name"] = "Praha" if scope == "praha" else row_dict.get("district_name")
+    return row_dict
 
 
 def _listing_age_bucket(duration_days) -> str:
@@ -360,3 +437,155 @@ def build_history_snapshot(current_df, previous_df, now):
     )
     logger.info(f"STAGE: History snapshot build finished | rows: {len(out)}")
     return out
+
+
+def repair_current_state(current_df, history_df=None, now=None):
+    if current_df.empty:
+        return current_df.copy()
+
+    history_df = _ensure_composite_id(history_df.copy()) if history_df is not None and not history_df.empty else pd.DataFrame()
+    out = _ensure_composite_id(current_df.copy())
+    effective_now = _to_ts(now)
+    if pd.isna(effective_now):
+        snapshot_candidates = pd.to_datetime(out.get("snapshot_date"), errors="coerce")
+        effective_now = snapshot_candidates.dropna().max() if not snapshot_candidates.dropna().empty else pd.Timestamp.utcnow()
+    latest_snapshot_date = effective_now.date()
+
+    earliest_seen = {}
+    earliest_removed = {}
+    if not history_df.empty:
+        hist = history_df.copy()
+        hist["snapshot_date"] = pd.to_datetime(hist.get("snapshot_date"), errors="coerce").dt.date
+        hist["scraped_at"] = pd.to_datetime(hist.get("scraped_at"), errors="coerce", utc=True)
+        if "exists_on_source" in hist.columns:
+            active_hist = hist[hist["exists_on_source"] == True].copy()
+            removed_hist = hist[hist["exists_on_source"] == False].copy()
+            if not active_hist.empty:
+                earliest_seen = (
+                    active_hist.sort_values(["snapshot_date", "scraped_at"])
+                    .groupby("composite_id")["snapshot_date"]
+                    .first()
+                    .to_dict()
+                )
+            if not removed_hist.empty:
+                earliest_removed = (
+                    removed_hist.sort_values(["snapshot_date", "scraped_at"])
+                    .groupby("composite_id")["snapshot_date"]
+                    .first()
+                    .to_dict()
+                )
+
+    repaired_rows = []
+    for row in out.to_dict("records"):
+        row = _repair_geo_fields(row)
+        rid = row.get("composite_id")
+
+        first_seen = _to_ts(row.get("first_seen_at"))
+        if pd.isna(first_seen):
+            hist_first = earliest_seen.get(rid)
+            if hist_first:
+                first_seen = pd.Timestamp(hist_first)
+            else:
+                last_seen = _to_ts(row.get("last_seen_at"))
+                first_seen = last_seen if pd.notna(last_seen) else effective_now
+        row["first_seen_at"] = first_seen
+
+        removed_date = earliest_removed.get(rid) or _effective_removed_date(row, fallback_latest_date=latest_snapshot_date)
+        if _safe_bool(row.get("is_removed"), default=False):
+            row["removed_at"] = pd.Timestamp(removed_date) if removed_date else _to_ts(row.get("removed_at"))
+        else:
+            row["removed_at"] = pd.NaT
+
+        comparison_ts = _to_ts(row.get("removed_at")) if _safe_bool(row.get("is_removed"), default=False) and pd.notna(_to_ts(row.get("removed_at"))) else effective_now
+        try:
+            listing_days = round((comparison_ts - pd.Timestamp(first_seen)).total_seconds() / 86400.0, 2)
+        except Exception:
+            listing_days = None
+        row["listing_duration_days"] = listing_days
+        row["listing_age_bucket"] = _listing_age_bucket(listing_days)
+
+        if _safe_bool(row.get("is_removed"), default=False) and pd.notna(_to_ts(row.get("removed_at"))):
+            try:
+                row["removed_duration_days"] = round((pd.Timestamp(row["removed_at"]) - pd.Timestamp(first_seen)).total_seconds() / 86400.0, 2)
+            except Exception:
+                row["removed_duration_days"] = listing_days
+        repaired_rows.append(row)
+
+    return _ensure(pd.DataFrame(repaired_rows), CURRENT_COLS)
+
+
+def rebuild_daily_history_from_lifecycle(current_df, history_df):
+    current_df = _ensure_composite_id(current_df.copy())
+    history_df = _ensure_composite_id(history_df.copy()) if history_df is not None and not history_df.empty else pd.DataFrame(columns=HISTORY_COLS)
+    if current_df.empty:
+        return _ensure(history_df, HISTORY_COLS)
+
+    if not history_df.empty:
+        history_df["snapshot_date"] = pd.to_datetime(history_df.get("snapshot_date"), errors="coerce").dt.date
+        history_df["scraped_at"] = pd.to_datetime(history_df.get("scraped_at"), errors="coerce", utc=True)
+        history_df = (
+            history_df.sort_values(["snapshot_date", "scraped_at"])
+            .drop_duplicates(subset=["snapshot_date", "composite_id", "exists_on_source"], keep="last")
+            .reset_index(drop=True)
+        )
+
+    current_df["first_seen_at"] = pd.to_datetime(current_df.get("first_seen_at"), errors="coerce")
+    current_df["last_seen_at"] = pd.to_datetime(current_df.get("last_seen_at"), errors="coerce")
+    current_df["removed_at"] = pd.to_datetime(current_df.get("removed_at"), errors="coerce")
+    current_df["snapshot_date"] = pd.to_datetime(current_df.get("snapshot_date"), errors="coerce").dt.date
+
+    history_snapshot_dates = sorted(date for date in history_df.get("snapshot_date", pd.Series(dtype=object)).dropna().tolist()) if not history_df.empty else []
+    if history_snapshot_dates:
+        snapshot_dates = sorted(set(history_snapshot_dates) | set(current_df["snapshot_date"].dropna().tolist()))
+    else:
+        snapshot_dates = set()
+        snapshot_dates.update(current_df["snapshot_date"].dropna().tolist())
+        snapshot_dates.update(current_df["first_seen_at"].dropna().dt.date.tolist())
+        snapshot_dates.update(current_df["removed_at"].dropna().dt.date.tolist())
+        snapshot_dates = sorted(date for date in snapshot_dates if date is not None)
+    if not snapshot_dates:
+        return _ensure(history_df, HISTORY_COLS)
+
+    history_lookup = {}
+    if not history_df.empty:
+        for row in history_df.to_dict("records"):
+            history_lookup[(row.get("snapshot_date"), row.get("composite_id"), _safe_bool(row.get("exists_on_source"), default=True))] = row
+
+    rebuilt_rows = []
+    latest_snapshot_date = snapshot_dates[-1]
+    for row in current_df.to_dict("records"):
+        rid = row.get("composite_id")
+        first_seen_date = _to_date(row.get("first_seen_at")) or _to_date(row.get("snapshot_date")) or latest_snapshot_date
+        removed_date = _effective_removed_date(row, fallback_latest_date=latest_snapshot_date)
+        last_active_date = (removed_date - timedelta(days=1)) if removed_date else latest_snapshot_date
+        if not _safe_bool(row.get("is_active"), default=True):
+            last_active_date = min(last_active_date, latest_snapshot_date - timedelta(days=1))
+
+        for snapshot_date in snapshot_dates:
+            if snapshot_date < first_seen_date or snapshot_date > last_active_date:
+                continue
+            existing = history_lookup.get((snapshot_date, rid, True), {})
+            base = dict(row)
+            base.update(existing)
+            base["snapshot_date"] = snapshot_date
+            base["scraped_at"] = existing.get("scraped_at") or pd.Timestamp(snapshot_date, tz="UTC")
+            base["exists_on_source"] = True
+            rebuilt_rows.append(base)
+
+        if removed_date:
+            existing_removed = history_lookup.get((removed_date, rid, False), {})
+            removed_row = dict(row)
+            removed_row.update(existing_removed)
+            removed_row["snapshot_date"] = removed_date
+            removed_row["scraped_at"] = existing_removed.get("scraped_at") or pd.Timestamp(removed_date, tz="UTC")
+            removed_row["exists_on_source"] = False
+            rebuilt_rows.append(removed_row)
+
+    rebuilt = _ensure(pd.DataFrame(rebuilt_rows), HISTORY_COLS)
+    rebuilt["scraped_at"] = pd.to_datetime(rebuilt["scraped_at"], errors="coerce", utc=True)
+    rebuilt = (
+        rebuilt.sort_values(["snapshot_date", "scraped_at", "exists_on_source"])
+        .drop_duplicates(subset=["snapshot_date", "composite_id", "exists_on_source"], keep="last")
+        .reset_index(drop=True)
+    )
+    return rebuilt
