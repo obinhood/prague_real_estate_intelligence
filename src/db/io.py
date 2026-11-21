@@ -35,9 +35,21 @@ SELECT
     COALESCE(ls.district_name, l.latest_district_name) AS district_name,
     COALESCE(ls.prague_zone, l.latest_prague_zone) AS prague_zone,
     COALESCE(ls.location_quality, l.location_quality) AS location_quality,
-    ls.city_name,
-    ls.region_name,
-    ls.country_name,
+    COALESCE(
+        ls.city_name,
+        CASE
+            WHEN l.property_search_type LIKE '%_sc' THEN COALESCE(ls.district_name, l.latest_district_name)
+            ELSE 'Praha'
+        END
+    ) AS city_name,
+    COALESCE(
+        ls.region_name,
+        CASE
+            WHEN l.property_search_type LIKE '%_sc' THEN 'Středočeský kraj'
+            ELSE 'Praha'
+        END
+    ) AS region_name,
+    COALESCE(ls.country_name, 'Czech Republic') AS country_name,
     ls.latitude,
     ls.longitude,
     ls.seller_type,

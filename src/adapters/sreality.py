@@ -1,7 +1,10 @@
 import re
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 from src.config import CONFIG
 from src.utils.helpers import clean_text, safe_float, json_dumps_safe
@@ -9,6 +12,35 @@ from src.utils.process_csv import looks_like_listing_title
 from src.utils.logger import get_logger
 
 logger = get_logger("sreality")
+
+# Thread-local storage so each worker thread owns its own session,
+# avoiding any subtle shared-mutable-state issues across threads.
+_thread_local = threading.local()
+
+
+def _make_session(headers: dict, timeout: int) -> requests.Session:
+    """
+    Build a requests.Session with:
+    - HTTP keep-alive connection pooling (pool_connections=10, pool_maxsize=20)
+    - A conservative urllib3-level retry for transient network errors only
+      (no retry on HTTP errors — those are handled in SrealityAdapter.fetch)
+    """
+    session = requests.Session()
+    session.headers.update(headers)
+    retry = Retry(
+        total=0,          # urllib3 retries disabled — we handle retries ourselves
+        connect=1,        # one reconnect attempt on connection error
+        read=0,
+        backoff_factor=0,
+    )
+    adapter = HTTPAdapter(
+        max_retries=retry,
+        pool_connections=10,   # number of connection pools
+        pool_maxsize=20,       # connections per pool
+    )
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
 
 
 class SrealityAdapter:
@@ -20,16 +52,25 @@ class SrealityAdapter:
         self.timeout = cfg["timeout_seconds"]
         self.headers = {"User-Agent": cfg["user_agent"]}
         self.property_paths = cfg["property_paths"]
-        self.max_workers = CONFIG.get("max_workers_listing_details", 4)
-        self.progress_every = CONFIG.get("detail_progress_log_every", 25)
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
+        self.max_workers = CONFIG.get("max_workers_listing_details", 8)
+        self.max_workers_list = CONFIG.get("max_workers_list_pages", 4)
+        self.progress_every = CONFIG.get("detail_progress_log_every", 50)
+        # Main-thread session for list-page crawl
+        self.session = _make_session(self.headers, self.timeout)
 
-    def fetch(self, url, retries=3, backoff=2):
+    def _get_thread_session(self) -> requests.Session:
+        """Return (or create) a per-thread session for detail-page workers."""
+        if not hasattr(_thread_local, "session"):
+            _thread_local.session = _make_session(self.headers, self.timeout)
+        return _thread_local.session
+
+    def fetch(self, url, retries=3, backoff=2, session=None):
+        """Fetch *url* with retry logic. Uses *session* if provided, else main session."""
+        s = session or self.session
         last_error = None
         for attempt in range(1, retries + 1):
             try:
-                resp = self.session.get(url, timeout=self.timeout)
+                resp = s.get(url, timeout=self.timeout)
                 resp.raise_for_status()
                 return resp.text
             except requests.exceptions.HTTPError as e:
@@ -100,7 +141,7 @@ class SrealityAdapter:
     def parse_detail_page(self, row):
         out = dict(row)
         try:
-            html = self.fetch(out["property_link"])
+            html = self.fetch(out["property_link"], session=self._get_thread_session())
             soup = BeautifulSoup(html, "html.parser")
             page_text = clean_text(soup.get_text(" ", strip=True)) or ""
             lower = page_text.lower()
@@ -147,27 +188,56 @@ class SrealityAdapter:
             out.setdefault(k, None)
         return out
 
+    def _scrape_property_type(self, property_search_type: str, base_url: str, max_pages_cfg) -> list:
+        """
+        Scrape all list pages for a single property_search_type.
+        Designed to be called from a thread pool so each type runs concurrently.
+        Each thread uses the shared main session (connection-pooled, thread-safe).
+        """
+        rows = []
+        try:
+            max_pages = max_pages_cfg or self.detect_max_pages(base_url)
+        except Exception as e:
+            logger.exception(f"{property_search_type} | failed max-page detection: {e}")
+            return rows
+
+        for page in range(1, max_pages + 1):
+            try:
+                html = self.fetch(f"{base_url}?strana={page}")
+                soup = BeautifulSoup(html, "html.parser")
+                page_rows = self.parse_listing_cards(soup, property_search_type)
+                rows.extend(page_rows)
+                logger.info(
+                    f"{property_search_type} | page {page}/{max_pages} | found {len(page_rows)} listing rows"
+                )
+            except Exception as e:
+                logger.exception(f"{property_search_type} | failed page {page}: {e}")
+        return rows
+
     def scrape(self):
         logger.info("STAGE: Sreality list-page crawl started")
-        all_rows = []
         max_pages_cfg = CONFIG.get("max_pages")
-        for property_search_type, base_url in self.property_paths.items():
-            logger.info(f"Collecting property type: {property_search_type}")
-            try:
-                max_pages = max_pages_cfg or self.detect_max_pages(base_url)
-            except Exception as e:
-                logger.exception(f"{property_search_type} | failed max-page detection: {e}")
-                continue
-            for page in range(1, max_pages + 1):
-                logger.info(f"{property_search_type} | scraping page {page}/{max_pages}")
+        all_rows = []
+
+        # Parallelise across property types (each type scrapes its own pages sequentially
+        # so pagination order is preserved; different types are fully independent).
+        max_workers_list = self.max_workers_list
+        logger.info(
+            f"STAGE: List-page crawl using {max_workers_list} parallel property-type workers"
+        )
+        with ThreadPoolExecutor(max_workers=max_workers_list) as ex:
+            futures = {
+                ex.submit(self._scrape_property_type, pst, url, max_pages_cfg): pst
+                for pst, url in self.property_paths.items()
+            }
+            for fut in as_completed(futures):
+                pst = futures[fut]
                 try:
-                    html = self.fetch(f"{base_url}?strana={page}")
-                    soup = BeautifulSoup(html, "html.parser")
-                    page_rows = self.parse_listing_cards(soup, property_search_type)
-                    all_rows.extend(page_rows)
-                    logger.info(f"{property_search_type} | page {page}/{max_pages} | found {len(page_rows)} listing rows")
+                    pst_rows = fut.result()
+                    all_rows.extend(pst_rows)
+                    logger.info(f"{pst} | crawl complete | rows collected: {len(pst_rows)}")
                 except Exception as e:
-                    logger.exception(f"{property_search_type} | failed page {page}: {e}")
+                    logger.exception(f"{pst} | list-page crawl failed: {e}")
 
         logger.info(f"STAGE: Sreality list-page crawl finished | raw rows: {len(all_rows)}")
         listing_rows = list({r['composite_id']: r for r in all_rows}.values())
@@ -177,9 +247,13 @@ class SrealityAdapter:
             logger.info("STAGE: Detail scraping disabled | returning list-page data only")
             return listing_rows
 
-        logger.info(f"STAGE: Detail-page enrichment started | total listings: {len(listing_rows)} | workers: {CONFIG.get('max_workers_listing_details', 4)}")
+        detail_workers = self.max_workers
+        logger.info(
+            f"STAGE: Detail-page enrichment started | "
+            f"total listings: {len(listing_rows)} | workers: {detail_workers}"
+        )
         enriched, completed, total = [], 0, len(listing_rows)
-        with ThreadPoolExecutor(max_workers=CONFIG.get("max_workers_listing_details", 4)) as ex:
+        with ThreadPoolExecutor(max_workers=detail_workers) as ex:
             futures = [ex.submit(self.parse_detail_page, row) for row in listing_rows]
             for fut in as_completed(futures):
                 try:
@@ -187,7 +261,7 @@ class SrealityAdapter:
                 except Exception as e:
                     logger.warning(f"Detail future failed: {e}")
                 completed += 1
-                if completed % CONFIG.get("detail_progress_log_every", 25) == 0 or completed == total:
+                if completed % self.progress_every == 0 or completed == total:
                     logger.info(f"STAGE: Detail-page enrichment progress | {completed}/{total}")
         logger.info(f"STAGE: Detail-page enrichment finished | enriched rows: {len(enriched)}")
         return enriched

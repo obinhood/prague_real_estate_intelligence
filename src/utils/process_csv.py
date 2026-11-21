@@ -47,51 +47,64 @@ NEIGHBOURHOOD_TO_ZONE: Dict[str, str] = {
     "Nusle": "Praha 4", "Podolí": "Praha 4", "Braník": "Praha 4",
     "Krč": "Praha 4", "Lhotka": "Praha 4", "Kunratice": "Praha 4",
     "Šeberov": "Praha 4", "Libuš": "Praha 4",
+    "Michle": "Praha 4", "Hodkovičky": "Praha 4",
     # Praha 5
     "Smíchov": "Praha 5", "Košíře": "Praha 5", "Motol": "Praha 5",
     "Hlubočepy": "Praha 5", "Radlice": "Praha 5", "Jinonice": "Praha 5",
     "Zličín": "Praha 5", "Řeporyje": "Praha 5",
+    "Slivenec": "Praha 5", "Holyně": "Praha 5", "Sobín": "Praha 5",
     # Praha 6
     "Dejvice": "Praha 6", "Břevnov": "Praha 6", "Bubeneč": "Praha 6",
     "Střešovice": "Praha 6", "Vokovice": "Praha 6", "Veleslavín": "Praha 6",
     "Ruzyně": "Praha 6", "Suchdol": "Praha 6", "Lysolaje": "Praha 6",
     "Řepy": "Praha 6",
+    "Nebušice": "Praha 6", "Liboc": "Praha 6", "Sedlec": "Praha 6",
+    "Přední Kopanina": "Praha 6", "Zadní Kopanina": "Praha 6",
     # Praha 7
     "Holešovice": "Praha 7", "Troja": "Praha 7", "Letná": "Praha 7",
     # Praha 8
     "Karlín": "Praha 8", "Libeň": "Praha 8", "Čimice": "Praha 8",
     "Dolní Chabry": "Praha 8", "Kobylisy": "Praha 8", "Bohnice": "Praha 8",
-    "Ďáblice": "Praha 8",
+    "Ďáblice": "Praha 8", "Březiněves": "Praha 8",
     # Praha 9
     "Vysočany": "Praha 9", "Prosek": "Praha 9", "Střížkov": "Praha 9",
     "Hloubětín": "Praha 9", "Hrdlořezy": "Praha 9",
     # Praha 10
     "Strašnice": "Praha 10", "Vršovice": "Praha 10", "Malešice": "Praha 10",
     "Záběhlice": "Praha 10", "Petrovice": "Praha 10",
+    "Dubeč": "Praha 10", "Štěrboholy": "Praha 10",
     # Praha 11
     "Chodov": "Praha 11", "Háje": "Praha 11",
     # Praha 12
     "Modřany": "Praha 12", "Kamýk": "Praha 12", "Písnice": "Praha 12",
+    "Točná": "Praha 12", "Komořany": "Praha 12", "Cholupice": "Praha 12",
     # Praha 13
-    "Stodůlky": "Praha 13", "Nové Butovice": "Praha 13",
+    "Stodůlky": "Praha 13", "Nové Butovice": "Praha 13", "Třebonice": "Praha 13",
     # Praha 14
-    "Kyje": "Praha 14",
+    "Kyje": "Praha 14", "Hostavice": "Praha 14",
+    "Dolní Počernice": "Praha 14", "Černý Most": "Praha 14",
     # Praha 15
     "Hostivař": "Praha 15", "Horní Měcholupy": "Praha 15",
+    "Dolní Měcholupy": "Praha 15",
     # Praha 16
     "Zbraslav": "Praha 16", "Radotín": "Praha 16",
-    # Praha 17
-    "Řepy": "Praha 17",
+    "Velká Chuchle": "Praha 16", "Lahovice": "Praha 16",
+    "Lipence": "Praha 16", "Lochkov": "Praha 16",
     # Praha 18
     "Čakovice": "Praha 18", "Letňany": "Praha 18", "Třeboradice": "Praha 18",
+    "Miškovice": "Praha 18", "Vinoř": "Praha 18",
     # Praha 19
     "Satalice": "Praha 19", "Kbely": "Praha 19",
     # Praha 20
     "Horní Počernice": "Praha 20",
     # Praha 21
     "Klánovice": "Praha 21", "Újezd nad Lesy": "Praha 21", "Běchovice": "Praha 21",
+    "Koloděje": "Praha 21",
     # Praha 22
     "Benice": "Praha 22", "Uhříněves": "Praha 22",
+    "Křeslice": "Praha 22", "Pitkovice": "Praha 22",
+    "Kolovraty": "Praha 22", "Královice": "Praha 22",
+    "Hájek u Uhříněvsi": "Praha 22",
 }
 
 ZONE_TO_BOROUGHS: Dict[str, set] = {}
@@ -136,6 +149,16 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Hradčanské náměstí":       ("Hradčany",    "Praha 1"),
     "Keplerova":                ("Hradčany",    "Praha 1"),
 
+    # ── Praha 1 (additional) ─────────────────────────────────────────────────
+    "Valentinská":              ("Staré Město", "Praha 1"),
+    "Krakovská":                ("Nové Město",  "Praha 1"),
+    "Ve Smečkách":              ("Nové Město",  "Praha 1"),
+    "Příčná":                   ("Nové Město",  "Praha 1"),
+    "Školská":                  ("Nové Město",  "Praha 1"),
+    "Soukenická":               ("Josefov",     "Praha 1"),
+    "U Starého židovského hřbitova": ("Josefov","Praha 1"),
+    "Vlašská":                  ("Malá Strana", "Praha 1"),
+
     # ── Praha 2 ──────────────────────────────────────────────────────────────
     "Korunní":                  ("Vinohrady",   "Praha 2"),
     "Mánesova":                 ("Vinohrady",   "Praha 2"),
@@ -164,6 +187,10 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Žitná":                    ("Nové Město",  "Praha 2"),
     "Legerova":                 ("Nové Město",  "Praha 2"),
     "Mánesovo nábřeží":         ("Nové Město",  "Praha 2"),
+    "Na Folimance":             ("Vinohrady",   "Praha 2"),
+    "Tyršova":                  ("Nové Město",  "Praha 2"),
+    "Lucemburská":              ("Vinohrady",   "Praha 2"),
+    "Janáčkovo nábřeží":        ("Smíchov",     "Praha 5"),  # west bank embankment
 
     # ── Praha 3 ──────────────────────────────────────────────────────────────
     "Seifertova":               ("Žižkov",      "Praha 3"),
@@ -189,6 +216,11 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Dykova":                   ("Vinohrady",   "Praha 3"),
     "Perunova":                 ("Vinohrady",   "Praha 3"),
 
+    # ── Praha 3 (additional) ─────────────────────────────────────────────────
+    "Vinohradská":              ("Vinohrady",   "Praha 3"),
+    "U Nákladového nádraží":    ("Žižkov",      "Praha 3"),
+    "Pod šancemi":              ("Žižkov",      "Praha 3"),
+
     # ── Praha 4 ──────────────────────────────────────────────────────────────
     "Na Pankráci":              ("Nusle",       "Praha 4"),
     "Budějovická":              ("Michle",      "Praha 4"),
@@ -204,6 +236,16 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Olbrachtova":              ("Nusle",       "Praha 4"),
     "Táborská":                 ("Nusle",       "Praha 4"),
     "Pujmanové":                ("Nusle",       "Praha 4"),
+    "Michelská":                ("Michle",      "Praha 4"),
+    "Gollové":                  ("Nusle",       "Praha 4"),
+    "Nuselská":                 ("Nusle",       "Praha 4"),
+    "Závišova":                 ("Nusle",       "Praha 4"),
+    "Na hvězdárně":             ("Pankrác",     "Praha 4"),
+    "V Zeleném údolí":          ("Podolí",      "Praha 4"),
+    "Hodějovská":               ("Libuš",       "Praha 4"),
+    "Branská":                  ("Braník",      "Praha 4"),
+    "5. května":                ("Nusle",       "Praha 4"),
+    "K lučinám":                ("Braník",      "Praha 4"),
 
     # ── Praha 5 ──────────────────────────────────────────────────────────────
     "Nádražní":                 ("Smíchov",     "Praha 5"),
@@ -221,6 +263,11 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Plzeňské náměstí":         ("Smíchov",     "Praha 5"),
     "Na Větrníku":              ("Košíře",      "Praha 5"),
     "Náměstí 14. října":        ("Smíchov",     "Praha 5"),
+    "Strakonická":              ("Smíchov",     "Praha 5"),
+    "Jinonická":                ("Jinonice",    "Praha 5"),
+    "Lékařská":                 ("Motol",       "Praha 5"),
+    "Císařská louka":           ("Smíchov",     "Praha 5"),
+    "Nad Hutěmi":               ("Košíře",      "Praha 5"),
 
     # ── Praha 6 ──────────────────────────────────────────────────────────────
     "Dejvická":                 ("Dejvice",     "Praha 6"),
@@ -239,6 +286,11 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Nad Šárkou":               ("Dejvice",     "Praha 6"),
     "Nad Paťankou":             ("Bubeneč",     "Praha 6"),
     "Evropská":                 ("Dejvice",     "Praha 6"),
+    "Na dlouhém lánu":          ("Bubeneč",     "Praha 6"),
+    "Paťanka":                  ("Bubeneč",     "Praha 6"),
+    "Nad Kesnerkou":            ("Vokovice",    "Praha 6"),
+    "Drnovská":                 ("Vokovice",    "Praha 6"),
+    "Pod novým lesem":          ("Bubeneč",     "Praha 6"),
 
     # ── Praha 7 ──────────────────────────────────────────────────────────────
     "Milady Horákové":          ("Holešovice",  "Praha 7"),
@@ -255,6 +307,7 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Strojnická":               ("Holešovice",  "Praha 7"),
     "Nad Královskou oborou":    ("Bubeneč",     "Praha 7"),
     "U Průhonu":                ("Holešovice",  "Praha 7"),
+    "Sanderova":                ("Holešovice",  "Praha 7"),
 
     # ── Praha 8 ──────────────────────────────────────────────────────────────
     "Sokolovská":               ("Karlín",      "Praha 8"),
@@ -272,6 +325,12 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Střelničná":               ("Kobylisy",    "Praha 8"),
     "Čimická":                  ("Čimice",      "Praha 8"),
     "Ďáblická":                 ("Ďáblice",     "Praha 8"),
+    "Bohušovická":              ("Libeň",       "Praha 8"),
+    "Lovosická":                ("Kobylisy",    "Praha 8"),
+    "Hartigova":                ("Libeň",       "Praha 8"),
+    "Bessemerova":              ("Libeň",       "Praha 8"),
+    "Svídnická":                ("Kobylisy",    "Praha 8"),
+    "Povltavská":               ("Libeň",       "Praha 8"),
 
     # ── Praha 9 ──────────────────────────────────────────────────────────────
     "Prosecká":                 ("Prosek",      "Praha 9"),
@@ -281,6 +340,13 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Kolbenova":                ("Vysočany",    "Praha 9"),
     "Chlumecká":                ("Hloubětín",   "Praha 9"),
     "Mladoboleslavská":         ("Vysočany",    "Praha 9"),
+    "Návarovská":               ("Prosek",      "Praha 9"),
+    "Cementářská":              ("Střížkov",    "Praha 9"),
+    "Janovská":                 ("Hloubětín",   "Praha 9"),
+    "Spojovací":                ("Vysočany",    "Praha 9"),
+    "Českomoravská":            ("Vysočany",    "Praha 9"),
+    "Březenská":                ("Hloubětín",   "Praha 9"),
+    "Jáchymovská":              ("Střížkov",    "Praha 9"),
 
     # ── Praha 10 ─────────────────────────────────────────────────────────────
     "Vršovická":                ("Vršovice",    "Praha 10"),
@@ -292,26 +358,58 @@ STREET_TO_LOCATION: Dict[str, Tuple[str, str]] = {
     "Počernická":               ("Malešice",    "Praha 10"),
     "Limuzská":                 ("Malešice",    "Praha 10"),
     "Průběžná":                 ("Strašnice",   "Praha 10"),
+    "Rybalkova":                ("Vršovice",    "Praha 10"),
+    "Na Balkáně":               ("Strašnice",   "Praha 10"),
+    "V úžlabině":               ("Záběhlice",   "Praha 10"),
+    "Na hroudě":                ("Malešice",    "Praha 10"),
+    "Drahňovická":              ("Záběhlice",   "Praha 10"),
+    "U vršovického hřbitova":   ("Vršovice",    "Praha 10"),
+    "Poznaňská":                ("Vršovice",    "Praha 10"),
+    "Nad olšinami":             ("Strašnice",   "Praha 10"),
+    "Náchodská":                ("Strašnice",   "Praha 10"),
 
     # ── Praha 11 ─────────────────────────────────────────────────────────────
     "Opatovická":               ("Chodov",      "Praha 11"),
     "Hviezdoslavova":           ("Háje",        "Praha 11"),
     "Ke Kateřinkám":            ("Chodov",      "Praha 11"),
+    "Leopoldova":               ("Chodov",      "Praha 11"),
+    "Kryšpínova":               ("Chodov",      "Praha 11"),
+    "Rezlerova":                ("Chodov",      "Praha 11"),
+    "Kaplická":                 ("Háje",        "Praha 11"),
+    "Škrábkových":              ("Chodov",      "Praha 11"),
 
     # ── Praha 12 ─────────────────────────────────────────────────────────────
     "Modřanská":                ("Modřany",     "Praha 12"),
     "Generála Šišky":           ("Modřany",     "Praha 12"),
     "Kamýcká":                  ("Kamýk",       "Praha 12"),
+    "Ve Lhotce":                ("Lhotka",      "Praha 12"),
 
     # ── Praha 13 ─────────────────────────────────────────────────────────────
     "Stodůlecká":               ("Stodůlky",    "Praha 13"),
     "Seydlerova":               ("Stodůlky",    "Praha 13"),
     "Bucharova":                ("Stodůlky",    "Praha 13"),
+    "Tupolevova":               ("Stodůlky",    "Praha 13"),
+    "Hůrská":                   ("Hůrka",       "Praha 13"),
 
     # ── Praha 14 ─────────────────────────────────────────────────────────────
     "Broumarská":               ("Kyje",        "Praha 14"),
     "Černokostelecká":          ("Kyje",        "Praha 14"),
+    "Českobrodská":             ("Kyje",        "Praha 14"),
+    "Za černým mostem":         ("Černý Most",  "Praha 14"),
+
+    # ── Praha 15 ─────────────────────────────────────────────────────────────
+    "Litvínovská":              ("Hostivař",    "Praha 15"),
+    "K sádkám":                 ("Hostivař",    "Praha 15"),
+
+    # ── Praha 17 ─────────────────────────────────────────────────────────────
+    "Bělohlávkova":             ("Řepy",        "Praha 17"),
+    "Miloše Havla":             ("Řepy",        "Praha 17"),
+
+    # ── Praha 22 ─────────────────────────────────────────────────────────────
+    "Práčská":                  ("Uhříněves",   "Praha 22"),
+    "Třísovská":                ("Uhříněves",   "Praha 22"),
 }
+
 
 # ─── Postal code (PSČ) → district ────────────────────────────────────────────
 # Czech postal codes have a reliable 1-to-1 or few-to-1 mapping with Prague
@@ -845,6 +943,28 @@ def parse_title(title, property_search_type=None):
     except Exception:
         address_txt = None
 
+    # Strip secondary "pozemek NNN m²" (or any "word NNN m²") that appears in
+    # dum_sc / chalupa titles: e.g. "178 m², pozemek 817 m² Zvěřínek" → "Zvěřínek".
+    # The first AREA_RE split already consumed the building area; any remaining
+    # "word NNN m²" prefix in address_txt is the land-plot size, not an address.
+    if address_txt:
+        address_txt = re.sub(
+            r"^[\s,]*(?:\w+\s+)?\d+(?:[.,]\d+)?\s*m²\s*",
+            "",
+            address_txt,
+            flags=re.IGNORECASE,
+        ).strip().strip(",").strip()
+        address_txt = address_txt if address_txt else None
+
+    # Strip trailing price-per-m² noise appended to addresses in some commercial
+    # titles: e.g. "Michelská, Praha" from "...Praha 4 9 950 000 Kč (15 426 Kč/m²)"
+    # We already split on the main price, but when "Praha N" bleeds into the split
+    # the district number may be left out; drop any remaining "NNN Kč" suffix.
+    if address_txt:
+        address_txt = re.sub(r"\s*\(?\d[\d\s]+Kč[^)]*\)?$", "", address_txt,
+                             flags=re.IGNORECASE).strip().strip(",").strip()
+        address_txt = address_txt if address_txt else None
+
     if address_txt:
         out["full_address"] = address_txt
         if "," in address_txt:
@@ -862,17 +982,30 @@ def parse_title(title, property_search_type=None):
         out["prague_zone"]      = prague_zone
         out["location_quality"] = location_quality
     else:
+        # Středočeský kraj: borough_name = municipality / town name,
+        # district_name = municipality / town name for UI/filtering,
+        # region_name retains "Středočeský kraj".
+        # For address "Street, Municipality" take the last comma part as the
+        # municipality; for "Municipality" alone keep it as-is.
         locality = None
         if address_txt:
             parts = [clean_text(part) for part in re.split(r",|\|", address_txt) if clean_text(part)]
             locality = parts[-1] if parts else clean_text(address_txt)
         locality = clean_text(locality)
+        # Strip non-location noise phrases (e.g. "Cena na vyžádání" appended to address)
+        if locality:
+            for bad in BAD_DISTRICT_PHRASES:
+                locality = locality.replace(bad, "").replace(bad.lower(), "")
+            locality = clean_text(locality).strip(",; ") or None
+        # If the locality looks like a Prague district, discard — it shouldn't
+        # appear in _sc listings; description enrichment will fill it in later.
         if locality and locality.lower().startswith("praha"):
             locality = None
         out["borough_name"] = locality
         out["district_name"] = locality
         out["prague_zone"] = None
-        out["location_quality"] = "ok" if locality else "missing_district,missing_borough"
+        out["city_name"] = locality or scope_defaults["city_name"]
+        out["location_quality"] = "ok" if locality else "missing_borough,missing_district"
     return out
 
 
